@@ -39,7 +39,7 @@ type
 implementation
 
 uses
-  System.SysUtils, System.Classes, System.IOUtils, Winapi.Windows,
+  System.SysUtils, System.Classes, System.IOUtils, uPlatformInfo, uPlatformFileOps,
   uFindSession;
 
 procedure QueueList(const AOnDone: TVfsListCallback; const AItems: TArray<TVfsEntry>;
@@ -173,7 +173,6 @@ begin
       I: Integer;
       Path: string;
       E: TVfsEntry;
-      Attr: DWORD;
     begin
       Err := TVfsError.Ok;
       Err.URI := URI;
@@ -232,20 +231,7 @@ begin
                 E.CreationTime := TDirectory.GetCreationTime(WinApiPath(Path));
                 E.AccessTime := TDirectory.GetLastAccessTime(WinApiPath(Path));
               end;
-                Attr := GetFileAttributes(PChar(WinApiPath(Path)));
-                if Attr <> INVALID_FILE_ATTRIBUTES then
-                begin
-                  E.IsHidden := ((Attr and FILE_ATTRIBUTE_HIDDEN) <> 0) or
-                    ((Attr and FILE_ATTRIBUTE_SYSTEM) <> 0);
-                  E.IsReadOnly := (Attr and FILE_ATTRIBUTE_READONLY) <> 0;
-                  E.IsSystem := (Attr and FILE_ATTRIBUTE_SYSTEM) <> 0;
-                  E.IsArchive := (Attr and FILE_ATTRIBUTE_ARCHIVE) <> 0;
-                  E.IsCompressed := (Attr and FILE_ATTRIBUTE_COMPRESSED) <> 0;
-                  E.IsEncrypted := (Attr and FILE_ATTRIBUTE_ENCRYPTED) <> 0;
-                  E.IsTemporary := (Attr and FILE_ATTRIBUTE_TEMPORARY) <> 0;
-                  E.IsOffline := (Attr and FILE_ATTRIBUTE_OFFLINE) <> 0;
-                  E.IsLink := (Attr and FILE_ATTRIBUTE_REPARSE_POINT) <> 0;
-                end;
+                PlatformFillEntryByPath(Path, E);
             except
               // keep defaults
             end;
@@ -363,29 +349,19 @@ begin
     procedure
     var
       Err: TVfsError;
-      FreeAvail, TotalNum: UInt64;
       FreeB, TotalB, DoneFree, DoneTotal: Int64;
       DoneErr: TVfsError;
-      DriveLocal: string;
     begin
       Err := TVfsError.Ok;
       Err.URI := RootURI;
       FreeB := -1;
       TotalB := -1;
       try
-        DriveLocal := ExtractFileDrive(Path);
-        if DriveLocal = '' then
-          Err := TVfsError.Make(vecInvalidURI, 'No drive root', RootURI)
-        else
+        if not PlatformDiskSpace(Path, FreeB, TotalB) then
         begin
-          DriveLocal := IncludeTrailingPathDelimiter(DriveLocal);
-          if GetDiskFreeSpaceEx(PChar(DriveLocal), FreeAvail, TotalNum, nil) then
-          begin
-            FreeB := Int64(FreeAvail);
-            TotalB := Int64(TotalNum);
-          end
-          else
-            Err := TVfsError.Make(vecIOError, 'GetDiskFreeSpaceEx failed', RootURI);
+          FreeB := -1;
+          TotalB := -1;
+          Err := TVfsError.Make(vecIOError, 'Disk space is not available', RootURI);
         end;
       except
         on E: Exception do

@@ -30,6 +30,7 @@ uses
   TestSevenZipUri in 'TestSevenZipUri.pas',
   TestZipEncryptedEntries in 'TestZipEncryptedEntries.pas',
   TestSpacedNames in 'TestSpacedNames.pas',
+  TestPosixPaths in 'TestPosixPaths.pas',
   TestOpenAsArchive in 'TestOpenAsArchive.pas',
   TestSftpVfs in 'TestSftpVfs.pas',
   TestSshConnections in 'TestSshConnections.pas',

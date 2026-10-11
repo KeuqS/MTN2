@@ -14,7 +14,7 @@ type
     [Test] procedure TestCaptionsAndFooters;
     [Test] procedure TestSeparatorAndTitle;
     [Test] procedure TestDriveLetterHit;
-    [Test] procedure TestDrivePreviewHelpers;
+    [Test] [Category('WindowsOnly')] procedure TestDrivePreviewHelpers;
     [Test] procedure TestDriveBarDraw;
     [Test] procedure TestDrawPanelHelpers;
     [Test] procedure TestDrawContentDispatch;

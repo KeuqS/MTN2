@@ -69,7 +69,7 @@ begin
     PluginSettings.SetValue('mtn.b', 'k', 'B');
     Assert.IsTrue(PluginSettings.TryGetValue('mtn.a', 'k', V) and (V = 'A'), 'first plugin');
     Assert.IsTrue(PluginSettings.TryGetValue('mtn.b', 'k', V) and (V = 'B'), 'second plugin');
-    PluginSettings.SetValue('..\evil', 'k', 'x');
+    PluginSettings.SetValue('../evil', 'k', 'x');
     Assert.IsTrue(TFile.Exists(TPath.Combine(Dir, 'plugin-settings-.._evil.json')),
       'a plugin id cannot move its file out of the settings folder');
   finally

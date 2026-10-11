@@ -21,6 +21,7 @@ type
 implementation
 
 uses
+  uTestPaths,
   System.SysUtils, System.IOUtils,
   uPluginManifest;
 
@@ -113,7 +114,7 @@ var
   Ext: string;
   HasZip: Boolean;
 begin
-  Dir := ExpandFileName(TPath.Combine(ExtractFilePath(ParamStr(0)), '..\..\plugins\mtn.7z'));
+  Dir := ExpandFileName(TPath.Combine(ExtractFilePath(ParamStr(0)), NativePath('../../plugins/mtn.7z')));
   Assert.IsTrue(TryReadPluginManifest(Dir, M), 'the shipped mtn.7z manifest is readable');
   HasZip := False;
   for Ext in M.ArchiveExtensions do
@@ -131,7 +132,7 @@ var
   Ids: TArray<string>;
 begin
   Dir := TPath.Combine(TPath.GetTempPath, 'mtn2-plugin-disabled-' + IntToStr(Random(MaxInt)));
-  FileName := TPath.Combine(Dir, 'sub\disabled-plugins.json');
+  FileName := TPath.Combine(Dir, NativePath('sub/disabled-plugins.json'));
   try
     Assert.IsTrue(not TryReadDisabledPlugins(FileName, Ids) and (Length(Ids) = 0), 'missing file');
     WriteDisabledPlugins(FileName, ['mtn.7z', 'mtn.ws']);
@@ -153,7 +154,7 @@ var
   Ids: TArray<string>;
 begin
   Dir := TPath.Combine(TPath.GetTempPath, 'mtn2-plugin-order-file-' + IntToStr(Random(MaxInt)));
-  FileName := TPath.Combine(Dir, 'sub\plugin-order.json');
+  FileName := TPath.Combine(Dir, NativePath('sub/plugin-order.json'));
   try
     Assert.IsTrue(not TryReadPluginOrder(FileName, Ids) and (Length(Ids) = 0), 'missing file');
     WritePluginOrder(FileName, ['mtn.ws', 'mtn.7z', 'mtn.tmp']);

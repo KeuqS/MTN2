@@ -19,6 +19,7 @@ type
 implementation
 
 uses
+  uTestPaths,
   System.SysUtils, System.Classes, System.IOUtils, System.SyncObjs, System.TypInfo,
   Winapi.Windows,
   uVfsTypes,
@@ -329,10 +330,10 @@ begin
   if TDirectory.Exists(Root) then
     TDirectory.Delete(Root, True);
   TDirectory.CreateDirectory(TPath.Combine(Root, 'mtn.7z'));
-  TFile.Copy(DllPath, TPath.Combine(Root, 'mtn.7z\SevenZipPlugin.dll'), True);
-  TFile.Copy(Dll, TPath.Combine(Root, 'mtn.7z\7z.dll'), True);
+  TFile.Copy(DllPath, TPath.Combine(Root, NativePath('mtn.7z/SevenZipPlugin.dll')), True);
+  TFile.Copy(Dll, TPath.Combine(Root, NativePath('mtn.7z/7z.dll')), True);
   TFile.Copy(ExpandFileName(TPath.Combine(ExtractFilePath(ParamStr(0)),
-    '..\..\plugins\mtn.7z\plugin.json')), TPath.Combine(Root, 'mtn.7z\plugin.json'), True);
+    NativePath('../../plugins/mtn.7z/plugin.json'))), TPath.Combine(Root, NativePath('mtn.7z/plugin.json')), True);
   try
     PluginLoader.SetOverrideAllowList([]);
     PluginLoader.LoadPluginsFrom(Root);

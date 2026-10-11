@@ -32,7 +32,7 @@ uses
   System.SyncObjs,
   System.Zip,
   System.Generics.Collections,
-  Winapi.Windows,
+  uPlatformInfo,
   uVfsTypes,
   uTextEncoding,
   uFileVfs,
@@ -128,13 +128,13 @@ end;
 /// app must pump those itself.</summary>
 function WaitDoc(ADoc: TEditorDoc): Boolean;
 var
-  Tick: Cardinal;
+  Tick: UInt64;
 begin
-  Tick := GetTickCount;
+  Tick := PlatformTickCount64;
   while ADoc.Loading do
   begin
     CheckSynchronize(20);
-    if GetTickCount - Tick > 60000 then
+    if PlatformTickCount64 - Tick > 60000 then
       Exit(False);
   end;
   CheckSynchronize(0);

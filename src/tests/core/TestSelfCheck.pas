@@ -22,7 +22,8 @@ type
 implementation
 
 uses
-  System.SysUtils, System.IOUtils, uSelfCheck;
+  uTestPaths,
+  System.SysUtils, System.IOUtils, uSelfCheck, uPlatformInfo;
 
 function NewTempDir: string;
 begin
@@ -58,12 +59,12 @@ end;
 
 procedure LayOutPackage(const ADir: string);
 begin
-  WriteText(TPath.Combine(ADir, 'help\en\index.md'), '# MTN2');
-  WriteText(TPath.Combine(ADir, 'help\ru\index.md'), '# MTN2');
-  WriteText(TPath.Combine(ADir, 'help\de\index.md'), '# MTN2');
-  WriteText(TPath.Combine(ADir, 'plugins\mtn.demo\plugin.json'),
+  WriteText(TPath.Combine(ADir, NativePath('help/en/index.md')), '# MTN2');
+  WriteText(TPath.Combine(ADir, NativePath('help/ru/index.md')), '# MTN2');
+  WriteText(TPath.Combine(ADir, NativePath('help/de/index.md')), '# MTN2');
+  WriteText(TPath.Combine(ADir, NativePath('plugins/mtn.demo/plugin.json')),
     '{"id":"mtn.demo","name":"Demo","version":"0.1.0","abi":1}');
-  WriteText(TPath.Combine(ADir, 'plugins\mtn.demo\plugin.wat'), '(module)');
+  WriteText(TPath.Combine(ADir, NativePath('plugins/mtn.demo/plugin.wat')), '(module)');
 end;
 
 procedure TTestSelfCheck.TestEmptyFolder;
@@ -76,14 +77,16 @@ begin
     Assert.IsFalse(RunSelfCheck(Dir, Report), 'an empty folder is not a runnable copy');
     Assert.IsTrue(HasLine(Report, 'OK', 'resource MENU_MAIN'), 'embedded menu found');
     Assert.IsTrue(HasLine(Report, 'OK', 'dialog resources'), 'embedded dialogs found');
-    Assert.IsTrue(HasLine(Report, 'FAIL', 'help\en\index.md'), 'missing en help reported');
-    Assert.IsTrue(HasLine(Report, 'FAIL', 'help\ru\index.md'),
+    Assert.IsTrue(HasLine(Report, 'FAIL', 'help' + PathDelim + 'en' + PathDelim + 'index.md'), 'missing en help reported');
+    Assert.IsTrue(HasLine(Report, 'FAIL', 'help' + PathDelim + 'ru' + PathDelim + 'index.md'),
       'missing help for the embedded ru locale reported');
-    Assert.IsTrue(HasLine(Report, 'FAIL', 'help\de\index.md'),
+    Assert.IsTrue(HasLine(Report, 'FAIL', 'help' + PathDelim + 'de' + PathDelim + 'index.md'),
       'missing help for the embedded de locale reported');
-    Assert.IsTrue(HasLine(Report, 'FAIL', 'sk4d.dll'), 'missing sk4d.dll reported');
-    Assert.IsTrue(HasLine(Report, 'WARN', 'wasmtime.dll'), 'missing wasmtime.dll is only a warning');
-    Assert.IsTrue(HasLine(Report, 'FAIL', 'plugins\ is missing'), 'missing plugins folder reported');
+    // Only a program that draws through Skia needs its library.
+    Assert.AreEqual(PlatformRenderLibrary <> '', HasLine(Report, 'FAIL', 'sk4d.dll'),
+      'missing Skia library reported where it is needed');
+    Assert.IsTrue(HasLine(Report, 'WARN', PlatformSharedLibName('wasmtime')), 'missing wasmtime.dll is only a warning');
+    Assert.IsTrue(HasLine(Report, 'FAIL', 'plugins' + PathDelim + ' is missing'), 'missing plugins folder reported');
   finally
     TDirectory.Delete(Dir, True);
   end;
@@ -98,11 +101,12 @@ begin
   try
     LayOutPackage(Dir);
     RunSelfCheck(Dir, Report);
-    Assert.IsTrue(HasLine(Report, 'OK', 'help\ru\index.md'), 'ru help found');
-    Assert.IsTrue(HasLine(Report, 'OK', 'help\de\index.md'), 'de help found');
+    Assert.IsTrue(HasLine(Report, 'OK', 'help' + PathDelim + 'ru' + PathDelim + 'index.md'), 'ru help found');
+    Assert.IsTrue(HasLine(Report, 'OK', 'help' + PathDelim + 'de' + PathDelim + 'index.md'), 'de help found');
     Assert.IsTrue(HasLine(Report, 'OK', 'plugin mtn.demo'), 'plugin with manifest and module passes');
-    Assert.AreEqual(1, FailCount(Report),
-      'only sk4d.dll (not copied into the temp folder) fails: ' + string.Join(' | ', Report));
+    // The Skia library, where one is needed, is not copied into the temp folder.
+    Assert.AreEqual(Integer(Ord(PlatformRenderLibrary <> '')), Integer(FailCount(Report)),
+      'only the Skia library fails: ' + string.Join(' | ', Report));
   finally
     TDirectory.Delete(Dir, True);
   end;
@@ -116,16 +120,16 @@ begin
   Dir := NewTempDir;
   try
     LayOutPackage(Dir);
-    WriteText(TPath.Combine(Dir, 'plugins\mtn.nomodule\plugin.json'),
+    WriteText(TPath.Combine(Dir, NativePath('plugins/mtn.nomodule/plugin.json')),
       '{"id":"mtn.nomodule","name":"x","version":"0.1.0","abi":1}');
-    WriteText(TPath.Combine(Dir, 'plugins\mtn.wrongid\plugin.json'),
+    WriteText(TPath.Combine(Dir, NativePath('plugins/mtn.wrongid/plugin.json')),
       '{"id":"mtn.other","name":"x","version":"0.1.0","abi":1}');
-    WriteText(TPath.Combine(Dir, 'plugins\mtn.wrongid\plugin.wat'), '(module)');
-    ForceDirectories(TPath.Combine(Dir, 'plugins\mtn.nomanifest'));
+    WriteText(TPath.Combine(Dir, NativePath('plugins/mtn.wrongid/plugin.wat')), '(module)');
+    ForceDirectories(TPath.Combine(Dir, NativePath('plugins/mtn.nomanifest')));
     RunSelfCheck(Dir, Report);
-    Assert.IsTrue(HasLine(Report, 'FAIL', 'mtn.nomodule\ has no module'), 'plugin without a module');
-    Assert.IsTrue(HasLine(Report, 'FAIL', 'mtn.wrongid\plugin.json names id'), 'manifest id mismatch');
-    Assert.IsTrue(HasLine(Report, 'FAIL', 'mtn.nomanifest\plugin.json is missing'), 'missing manifest');
+    Assert.IsTrue(HasLine(Report, 'FAIL', 'mtn.nomodule' + PathDelim + ' has no module'), 'plugin without a module');
+    Assert.IsTrue(HasLine(Report, 'FAIL', 'mtn.wrongid' + PathDelim + 'plugin.json names id'), 'manifest id mismatch');
+    Assert.IsTrue(HasLine(Report, 'FAIL', 'mtn.nomanifest' + PathDelim + 'plugin.json is missing'), 'missing manifest');
   finally
     TDirectory.Delete(Dir, True);
   end;

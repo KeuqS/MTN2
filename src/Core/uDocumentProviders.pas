@@ -70,7 +70,7 @@ implementation
 
 uses
   uStrings,
-  System.IOUtils, Winapi.Windows, Winapi.ShellAPI,
+  System.IOUtils, uShellAssoc,
   uVfsTypes;
 
 type
@@ -124,7 +124,7 @@ begin
   Path := FileUriToPath(AURI);
   if (Path = '') or not TFile.Exists(Path) then
     Exit;
-  Result := ShellExecute(0, 'open', PChar(Path), nil, nil, SW_SHOWNORMAL) > 32;
+  Result := ShellOpenFile(Path);
 end;
 
 constructor TDocumentProviderRegistry.Create;

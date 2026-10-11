@@ -31,6 +31,7 @@ uses
   System.IOUtils,
   uTextEncoding,
   uVfsTypes,
+  uPlatformPaths,
   uLinkUtils;
 
 var
@@ -104,6 +105,13 @@ begin
   SrcDir := TPath.Combine(GRoot, 'srcdir');
   LinkDir := TPath.Combine(GRoot, 'junctiondir');
   Ok := CreateFileLink(LinkDir, SrcDir, lkJunction, Err);
+  if PlatformPosixPaths then
+  begin
+    // Junctions exist only on Windows.
+    Assert.IsFalse(Ok, 'a junction is refused');
+    Assert.AreEqual(Ord(vecNotSupported), Ord(Err.Code), 'as not supported');
+    Exit;
+  end;
   Assert.IsTrue(Ok, 'CreateFileLink(lkJunction) succeeds');
   if Ok then
     Assert.IsTrue(TFile.Exists(TPath.Combine(LinkDir, 'inside.txt')), 'junction resolves to contents')

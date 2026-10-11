@@ -69,8 +69,7 @@ procedure ColorCodingSetFieldValue(var AFields: TColorCodingEditFields;
 implementation
 
 uses
-  Winapi.Windows,
-  uANSIParser, uPanelColumns;
+  uPlatformInfo, uANSIParser, uPanelColumns;
 
 procedure RestoreGrayOpKey(var AKey: Word; const AKeyChar: Char);
 begin
@@ -80,11 +79,11 @@ begin
     and opened the deselect-mask dialog). }
   if AKey <> 0 then
     Exit;
-  if GetAsyncKeyState(VK_ADD) < 0 then
+  if PlatformKeyIsDown(vkAdd) then
     AKey := vkAdd
-  else if GetAsyncKeyState(VK_SUBTRACT) < 0 then
+  else if PlatformKeyIsDown(vkSubtract) then
     AKey := vkSubtract
-  else if GetAsyncKeyState(VK_MULTIPLY) < 0 then
+  else if PlatformKeyIsDown(vkMultiply) then
     AKey := vkMultiply
   else if AKeyChar = '+' then
     AKey := vkAdd

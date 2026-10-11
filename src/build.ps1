@@ -75,7 +75,7 @@ if (-not $Exe) {
 $PluginsOut = Join-Path (Split-Path $Exe -Parent) 'plugins'
 $PluginsSrc = Join-Path $PSScriptRoot 'plugins'
 $PluginDcu = Join-Path $PSScriptRoot 'dcu'
-$CoreDir = Join-Path $PSScriptRoot 'Core'
+$CoreDir = (Join-Path $PSScriptRoot 'Core') + ';' + (Join-Path $PSScriptRoot 'Platform\Windows')
 New-Item -ItemType Directory -Force -Path $PluginsOut | Out-Null
 New-Item -ItemType Directory -Force -Path $PluginDcu | Out-Null
 # Plugins are built with dcc64 directly (not msbuild): mirror MTN2.dproj's

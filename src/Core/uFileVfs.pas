@@ -1,4 +1,4 @@
-﻿unit uFileVfs;
+unit uFileVfs;
 
 { Local file:// VFS provider. All I/O runs off the UI thread and results are
   marshaled via TThread.Queue. Delete / Copy / Move with progress. }
@@ -40,7 +40,7 @@ implementation
 
 uses
   System.SysUtils, System.Classes, System.IOUtils, System.Generics.Collections,
-  System.Generics.Defaults, Winapi.Windows, uFileRecycleBin, uVfsUtils;
+  System.Generics.Defaults, uPlatformInfo, uPlatformFileOps, uFileRecycleBin, uVfsUtils;
 
 type
   TVfsEntryComparer = class(TComparer<TVfsEntry>)
@@ -50,18 +50,6 @@ type
 
 var
   GLastProgressQueueTick: UInt64 = 0;
-
-function FindDataFileTimeToDateTime(const AFT: TFileTime): TDateTime;
-var
-  LFT: TFileTime;
-  ST: TSystemTime;
-begin
-  Result := 0;
-  if (AFT.dwLowDateTime = 0) and (AFT.dwHighDateTime = 0) then
-    Exit;
-  if FileTimeToLocalFileTime(AFT, LFT) and FileTimeToSystemTime(LFT, ST) then
-    Result := SystemTimeToDateTime(ST);
-end;
 
 function TVfsEntryComparer.Compare(const Left, Right: TVfsEntry): Integer;
 begin
@@ -158,7 +146,7 @@ begin
   // gets dropped, so the per-file bar visibly skips past 100% straight into
   // the next file's low percentage and never appears to finish.
   Force := ((T > 0) and (D >= T)) or ((IT > 0) and (ID >= IT));
-  NowTick := GetTickCount64;
+  NowTick := PlatformTickCount64;
   if (not Force) and (NowTick - GLastProgressQueueTick < cMinQueueMs) then
     Exit;
   GLastProgressQueueTick := NowTick;
@@ -318,32 +306,15 @@ begin
 end;
 
 procedure PreserveFileAttributes(const ASrc, ADst: string);
-const
-  // Only the bits SetFileAttributes accepts (per WinAPI docs) -
-  // FILE_ATTRIBUTE_DIRECTORY/REPARSE_POINT/COMPRESSED/ENCRYPTED etc. are not
-  // settable this way and would make the call fail or be silently ignored.
-  AttrMask = FILE_ATTRIBUTE_READONLY or FILE_ATTRIBUTE_HIDDEN or
-    FILE_ATTRIBUTE_SYSTEM or FILE_ATTRIBUTE_ARCHIVE or
-    FILE_ATTRIBUTE_NOT_CONTENT_INDEXED or FILE_ATTRIBUTE_TEMPORARY or
-    FILE_ATTRIBUTE_OFFLINE;
-var
-  Attr: DWORD;
 begin
-  Attr := GetFileAttributes(PChar(WinApiPath(ASrc)));
-  if Attr <> INVALID_FILE_ATTRIBUTES then
-    SetFileAttributes(PChar(WinApiPath(ADst)), Attr and AttrMask);
+  PlatformCopyAttributes(ASrc, ADst);
 end;
 
-// A failed create/write/move raises an exception that carries the Win32 error
-// only as text ("Cannot create file ...: Access denied"). Access denied must
-// stay an access-denied error: the job offers an administrator pass for it.
+// Access denied must stay an access-denied error: the job offers an
+// administrator pass for it.
 function VfsErrorFromException(E: Exception; const AURI: string): TVfsError;
-var
-  Denied: string;
 begin
-  Denied := SysErrorMessage(ERROR_ACCESS_DENIED);
-  if ((E is EOSError) and (EOSError(E).ErrorCode = ERROR_ACCESS_DENIED)) or
-     ((Denied <> '') and (Pos(LowerCase(Denied), LowerCase(E.Message)) > 0)) then
+  if PlatformIsAccessDenied(E) then
     Result := TVfsError.Make(vecAccessDenied, E.Message, AURI)
   else
     Result := TVfsError.Make(vecIOError, E.Message, AURI);
@@ -664,70 +635,6 @@ begin
   end;
 end;
 
-procedure ClearDeleteBlockingAttr(const APath: string);
-var
-  Attr: DWORD;
-begin
-  Attr := GetFileAttributes(PChar(WinApiPath(APath)));
-  if Attr = INVALID_FILE_ATTRIBUTES then
-    Exit;
-  if (Attr and (FILE_ATTRIBUTE_READONLY or FILE_ATTRIBUTE_HIDDEN or
-      FILE_ATTRIBUTE_SYSTEM)) <> 0 then
-    SetFileAttributes(PChar(WinApiPath(APath)), Attr and not
-      (FILE_ATTRIBUTE_READONLY or FILE_ATTRIBUTE_HIDDEN or FILE_ATTRIBUTE_SYSTEM));
-end;
-
-function ExtendedWinPath(const APath: string): string;
-var
-  P: string;
-begin
-  P := ExcludeTrailingPathDelimiter(APath);
-  if P.StartsWith('\\?\', True) then
-    Exit(P);
-  if (Length(P) >= 2) and (P[1] = '\') and (P[2] = '\') then
-    Result := '\\?\UNC\' + Copy(P, 3, MaxInt)
-  else
-    Result := '\\?\' + P;
-end;
-
-function RetryWin32Delete(const APath: string; AIsDir: Boolean): DWORD;
-const
-  cMaxTries = 8;
-var
-  I: Integer;
-  P: string;
-  Ok: Boolean;
-begin
-  P := ExtendedWinPath(APath);
-  for I := 1 to cMaxTries do
-  begin
-    ClearDeleteBlockingAttr(P);
-    if AIsDir then
-      Ok := RemoveDirectory(PChar(P))
-    else
-      Ok := DeleteFile(PChar(P));
-    if Ok then
-      Exit(ERROR_SUCCESS);
-    Result := GetLastError;
-    if (Result = ERROR_FILE_NOT_FOUND) or (Result = ERROR_PATH_NOT_FOUND) then
-      Exit(ERROR_SUCCESS);
-    if (I < cMaxTries) and
-       ((Result = ERROR_SHARING_VIOLATION) or (Result = ERROR_ACCESS_DENIED) or
-        (Result = ERROR_DIR_NOT_EMPTY) or (Result = ERROR_LOCK_VIOLATION)) then
-      Sleep(25 * I)
-    else
-      Break;
-  end;
-end;
-
-procedure SetWin32DeleteError(const APath: string; ACode: DWORD; var AError: TVfsError);
-begin
-  if (ACode = ERROR_ACCESS_DENIED) or (ACode = ERROR_SHARING_VIOLATION) then
-    AError := TVfsError.Make(vecAccessDenied, SysErrorMessage(ACode), PathToFileUri(APath))
-  else
-    AError := TVfsError.Make(vecIOError, SysErrorMessage(ACode), PathToFileUri(APath));
-end;
-
 procedure DeleteTree(const APath: string; ACancel: IJobCancelToken;
   AOnProgress: TVfsProgressCallback; var ADoneItems: Int64; ATotalItems: Int64;
   var AError: TVfsError);
@@ -738,7 +645,6 @@ var
   Child: string;
   FirstErr, ChildErr: TVfsError;
   HasError: Boolean;
-  WinErr: DWORD;
 begin
   if JobCancelRequested(ACancel) then
   begin
@@ -754,7 +660,7 @@ begin
   FirstErr := TVfsError.Ok;
   HasError := False;
   try
-    if LocalPathIsDirectory(Path) then
+    if LocalPathIsDirectory(Path) and not PlatformIsLinkNode(Path) then
     begin
       Code := FindFirst(WinApiPath(TPath.Combine(Path, '*')), faAnyFile, SR);
       try
@@ -793,12 +699,8 @@ begin
       end;
       if not HasError then
       begin
-        WinErr := RetryWin32Delete(Path, True);
-        if WinErr <> ERROR_SUCCESS then
-        begin
-          SetWin32DeleteError(Path, WinErr, FirstErr);
-          HasError := True;
-        end
+        if not PlatformDeleteNode(Path, True, FirstErr) then
+          HasError := True
         else
         begin
           Inc(ADoneItems);
@@ -807,14 +709,10 @@ begin
         end;
       end;
     end
-    else if LocalPathIsFile(Path) then
+    else if LocalPathIsFile(Path) or PlatformIsLinkNode(Path) then
     begin
-      WinErr := RetryWin32Delete(Path, False);
-      if WinErr <> ERROR_SUCCESS then
-      begin
-        SetWin32DeleteError(Path, WinErr, FirstErr);
-        HasError := True;
-      end
+      if not PlatformDeleteNode(Path, False, FirstErr) then
+        HasError := True
       else
       begin
         Inc(ADoneItems);
@@ -891,8 +789,7 @@ begin
             List := TList<TVfsEntry>.Create;
             try
               Code := FindFirst(WinApiPath(TPath.Combine(Path, '*')), faAnyFile, SR);
-              // 5 = ERROR_ACCESS_DENIED (avoid Winapi.Windows - clashes with FindClose).
-              if Code = 5 then
+              if PlatformSearchDenied(Code) then
                 Err := TVfsError.Make(vecAccessDenied, 'Access denied', URI)
               else if Code = 0 then
               try
@@ -908,19 +805,7 @@ begin
                     Entry.Name := SR.Name;
                     Entry.Extension := LowerCase(TPath.GetExtension(SR.Name));
                     Entry.IsDirectory := (SR.Attr and faDirectory) <> 0;
-                    {$WARN SYMBOL_PLATFORM OFF}
-                    Entry.IsHidden := ((SR.Attr and faHidden) <> 0) or
-                      ((SR.Attr and faSysFile) <> 0);
-                    Entry.IsReadOnly := (SR.Attr and faReadOnly) <> 0;
-                    Entry.IsSystem := (SR.Attr and faSysFile) <> 0;
-                    Entry.IsArchive := (SR.Attr and faArchive) <> 0;
-                    Entry.IsCompressed := (SR.Attr and faCompressed) <> 0;
-                    Entry.IsEncrypted := (SR.Attr and faEncrypted) <> 0;
-                    Entry.IsTemporary := (DWORD(SR.Attr) and FILE_ATTRIBUTE_TEMPORARY) <> 0;
-                    Entry.IsOffline := (DWORD(SR.Attr) and FILE_ATTRIBUTE_OFFLINE) <> 0;
-                    // Windows: faSymLink = FILE_ATTRIBUTE_REPARSE_POINT
-                    Entry.IsLink := (SR.Attr and faSymLink) <> 0;
-                    {$WARN SYMBOL_PLATFORM ON}
+                    PlatformFillEntry(SR, Entry);
                     Entry.TargetURI := '';
                     if Entry.IsDirectory then
                     begin
@@ -929,17 +814,6 @@ begin
                     end
                     else
                       Entry.Size := SR.Size;
-                    Entry.ModificationTime := FindDataFileTimeToDateTime(SR.FindData.ftLastWriteTime);
-                    if Entry.ModificationTime = 0 then
-                      Entry.ModificationTime := SR.TimeStamp;
-
-                    Entry.CreationTime := FindDataFileTimeToDateTime(SR.FindData.ftCreationTime);
-                    if Entry.CreationTime = 0 then
-                      Entry.CreationTime := Entry.ModificationTime;
-
-                    Entry.AccessTime := FindDataFileTimeToDateTime(SR.FindData.ftLastAccessTime);
-                    if Entry.AccessTime = 0 then
-                      Entry.AccessTime := Entry.ModificationTime;
                     List.Add(Entry);
                   end;
                   Code := FindNext(SR);
@@ -1508,7 +1382,6 @@ begin
       Path: string;
       Err: TVfsError;
       {$WARN SYMBOL_PLATFORM OFF}
-      Attrs: TFileAttributes;
       {$WARN SYMBOL_PLATFORM ON}
       Bytes: TBytes;
       FS: TFileStream;
@@ -1527,11 +1400,8 @@ begin
           begin
             if TFile.Exists(WinApiPath(Path)) then
             begin
-              {$WARN SYMBOL_PLATFORM OFF}
-              Attrs := TFile.GetAttributes(WinApiPath(Path));
-              if TFileAttribute.faReadOnly in Attrs then
+              if PlatformIsReadOnlyFile(Path) then
                 Err := TVfsError.Make(vecAccessDenied, 'File is read-only', URI);
-              {$WARN SYMBOL_PLATFORM ON}
             end;
             if Err.Code = vecOk then
             begin
@@ -1623,9 +1493,8 @@ begin
   TThread.CreateAnonymousThread(
     procedure
     var
-      Path, Drive: string;
+      Path: string;
       Err, DoneErr: TVfsError;
-      FreeAvail, TotalNum: UInt64;
       FreeB, TotalB, DoneFree, DoneTotal: Int64;
     begin
       Err := TVfsError.Ok;
@@ -1638,19 +1507,11 @@ begin
         else
         begin
           Path := FileUriToPath(RootURI);
-          Drive := ExtractFileDrive(Path);
-          if Drive = '' then
-            Err := TVfsError.Make(vecInvalidURI, 'No drive root', RootURI)
-          else
+          if not PlatformDiskSpace(Path, FreeB, TotalB) then
           begin
-            Drive := IncludeTrailingPathDelimiter(Drive);
-            if GetDiskFreeSpaceEx(PChar(Drive), FreeAvail, TotalNum, nil) then
-            begin
-              FreeB := Int64(FreeAvail);
-              TotalB := Int64(TotalNum);
-            end
-            else
-              Err := TVfsError.Make(vecIOError, 'GetDiskFreeSpaceEx failed', RootURI);
+            FreeB := -1;
+            TotalB := -1;
+            Err := TVfsError.Make(vecIOError, 'Disk space is not available', RootURI);
           end;
         end;
       except

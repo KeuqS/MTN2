@@ -1,0 +1,51 @@
+# Fixtures run-tests-linux.ps1 leaves out: they test Windows-only code.
+# One group/Fixture per line; text after # is the reason.
+core/TestLiveReload            # Win32 file change notifications
+core/TestTerminalRenderer      # FireMonkey renderer
+dialogs/TestDialogAlignment    # Windows units in the fixture
+dialogs/TestDialogButtonLayout
+dialogs/TestDialogMnemonics
+dialogs/TestIOErrorAskDialog
+vfs/TestCopyIntoSelf
+vfs/TestCopyLockedSource       # Win32 sharing modes
+vfs/TestCopySkipMerge
+vfs/TestDeleteProgress
+vfs/TestDriveInfo              # drive letters
+vfs/TestElevatedHelper         # UAC helper
+vfs/TestFileFind
+vfs/TestRecycleBin             # Windows Recycle Bin
+vfs/TestRecycleBinFailure
+vfs/TestVfsDelete
+vfs/TestWinFileAttr            # R/H/S/A attributes and ACL owners
+core/TestElevatedProtocol      # UAC helper protocol
+dialogs/TestSetAttrDialog      # R/H/S/A attributes and creation times
+vfs/TestLongPaths              # \?\ extended-length paths
+vfs/TestResolveLocalDirPath    # drive roots
+vfs/TestSevenZipUri            # 7z URIs of Windows paths
+panels/TestDrivePopup          # drive letters
+panels/TestShellIcons          # Windows shell icons in a FireMonkey bitmap
+plugins/TestSamplePlugins      # plugins are Windows DLLs
+plugins/TestSevenZipOpen
+plugins/TestSevenZipPlugin
+plugins/TestTmpPanelPlugin
+plugins/TestWasmHost
+plugins/TestWorkspacePlugin
+shell/TestCdDirQuote           # cmd.exe and PowerShell sessions
+shell/TestPsTwoCommands
+shell/TestPtyLifecycle
+console/TestCmdBackspaceFlow   # cmd.exe and PowerShell sessions
+console/TestCmdRepeatedDirNoLineLoss
+console/TestConsoleBufferCmd
+console/TestFindEncoding
+console/TestLineBufferedBackspace
+console/TestPsBackspaceFlow
+console/TestPsCharByChar
+console/TestPsLineBuffered
+console/TestPsPersistent
+console/TestPtyCtrlC
+console/TestPtyPromptCount
+console/TestPtySession
+console/TestShellSessions
+console/TestPsPipeSafeCommand  # PowerShell command rewriting
+console/TestShellProfileOptions # Windows shell catalog
+console/TestShellProfiles

@@ -1,14 +1,10 @@
 unit uConfigLocation;
 
 { Centralized Configuration Directory Resolver for MTN2.
-  Supports Standard Mode (%APPDATA%\MTN2\) and Portable Mode (portable.dat).
+  Supports Standard Mode and Portable Mode (portable.dat).
 
-  CROSS-PLATFORM: already degrades reasonably on its own --
-  GetEnvironmentVariable('APPDATA') is empty on POSIX, so it already falls
-  back to TPath.GetHomePath (no crash, no Winapi.* dependency here at all).
-  Not yet XDG-correct though: on Linux this lands config files directly in
-  $HOME/MTN2/ instead of $XDG_CONFIG_HOME (~/.config/MTN2/); cheap to fix
-  when a POSIX build exists -- no reason to do it blind now. }
+  The folder of a normal installation is PlatformConfigDir: %APPDATA%\MTN2 on
+  Windows, $XDG_CONFIG_HOME/mtn2 (default ~/.config/mtn2) on Linux. }
 
 interface
 
@@ -25,6 +21,9 @@ function GetConfigDirectory: string;
 function GetConfigFilePath(const AFileName: string): string;
 
 implementation
+
+uses
+  uPlatformInfo;
 
 var
   GConfigDirOverride: string;
@@ -44,8 +43,6 @@ begin
 end;
 
 function GetConfigDirectory: string;
-var
-  AppDataDir: string;
 begin
   if GConfigDirOverride <> '' then
   begin
@@ -61,10 +58,7 @@ begin
   end
   else
   begin
-    AppDataDir := GetEnvironmentVariable('APPDATA');
-    if AppDataDir = '' then
-      AppDataDir := TPath.GetHomePath;
-    Result := TPath.Combine(AppDataDir, 'MTN2');
+    Result := PlatformConfigDir;
     if not DirectoryExists(Result) then
       ForceDirectories(Result);
   end;

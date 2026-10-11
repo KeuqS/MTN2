@@ -32,7 +32,7 @@ implementation
 
 uses
   System.SysUtils, System.Classes, System.UITypes, System.IOUtils,
-  uDialogTypes,
+  uDialogTypes, uPlatformPaths,
   uDialogJson,
   uDialogResources,
   uDialogHost,
@@ -352,6 +352,24 @@ begin
   end;
 end;
 
+// The same file under another spelling: Windows paths compare without case,
+// elsewhere only an identical path is the same file.
+function ReopenUri: string;
+begin
+  if PlatformPosixPaths then
+    Result := 'file:///C:/a.txt'
+  else
+    Result := 'file:///C:/A.TXT';
+end;
+
+function RemoveUri: string;
+begin
+  if PlatformPosixPaths then
+    Result := 'file:///C:/b.txt'
+  else
+    Result := 'file:///c:/b.txt';
+end;
+
 procedure TestFileHistoryStore;
 begin
   WithFileHistoryBackup(
@@ -369,19 +387,19 @@ begin
         (E[2].URI = 'file:///C:/a.txt'), 'newest first');
       Assert.IsTrue(E[1].Edit and not E[0].Edit, 'mode kept per entry');
 
-      FileHistoryPush('file:///C:/A.TXT', True);
+      FileHistoryPush(ReopenUri, True);
       E := FileHistoryGetEntries;
       Assert.IsTrue(Length(E) = 3, 'reopening a file does not duplicate it (case-insensitive URI)');
-      Assert.IsTrue((E[0].URI = 'file:///C:/A.TXT') and E[0].Edit,
+      Assert.IsTrue((E[0].URI = ReopenUri) and E[0].Edit,
         'reopened file moves to the top with its latest mode');
 
       FileHistoryReload;
       E := FileHistoryGetEntries;
-      Assert.IsTrue((Length(E) = 3) and (E[0].URI = 'file:///C:/A.TXT') and E[0].Edit and
+      Assert.IsTrue((Length(E) = 3) and (E[0].URI = ReopenUri) and E[0].Edit and
         (E[1].URI = 'file:///C:/c.txt') and not E[1].Edit,
         'filehistory.json round-trips order and mode');
 
-      FileHistoryRemove('file:///c:/b.txt');
+      FileHistoryRemove(RemoveUri);
       E := FileHistoryGetEntries;
       Assert.IsTrue((Length(E) = 2) and (E[1].URI = 'file:///C:/c.txt'), 'Remove drops only that file');
 

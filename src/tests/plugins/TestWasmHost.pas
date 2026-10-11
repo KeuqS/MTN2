@@ -28,6 +28,7 @@ type
 implementation
 
 uses
+  uTestPaths,
   System.SysUtils, System.Classes, System.IOUtils, System.SyncObjs, System.TypInfo,
   System.UITypes,
   Winapi.Windows,
@@ -66,7 +67,7 @@ uses
 function DemoPluginDir: string;
 begin
   Result := ExpandFileName(TPath.Combine(ExtractFilePath(ParamStr(0)),
-    '..\..\plugins\mtn.wasm.demo'));
+    NativePath('../../plugins/mtn.wasm.demo')));
 end;
 
 procedure WaitList(const AVfs: IVirtualFileSystem; const AURI: string;

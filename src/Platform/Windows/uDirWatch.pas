@@ -3,12 +3,8 @@ unit uDirWatch;
 { Watches a local directory via FindFirstChangeNotification and notifies the
   main thread (debounced) when contents change.
 
-  CROSS-PLATFORM: FindFirstChangeNotification is Windows-only;
-  POSIX needs inotify (Linux) or kqueue (macOS/BSD) instead -- different
-  mechanisms per OS, no single portable primitive. The public surface here
-  (Create / SetPath / OnChanged callback) is already implementation-agnostic,
-  so a port only needs a new StartWatcher/StopWatcher body per platform,
-  not a caller-facing change. }
+  The Posix build (inotify) lives in Platform\Posix; each project puts
+  exactly one of the two directories on its unit search path. }
 
 interface
 

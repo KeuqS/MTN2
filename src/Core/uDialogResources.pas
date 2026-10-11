@@ -142,7 +142,7 @@ procedure DialogSetColorSampleSources(var ADecl: TDialogDeclaration; const AId: 
 implementation
 
 uses
-  System.Classes, System.Math, System.IOUtils, Winapi.Windows,
+  System.Classes, System.Math, System.IOUtils, uResourceAccess,
   uDialogJson, uDialogLocaleLayout, uInputLine, uStrings, uColorPickerControl;
 
 function DialogResNameToJsonFile(const AResName: string): string;
@@ -227,28 +227,15 @@ end;
 function TryLoadDialogResourceJson(const AResName: string;
   out AJson: string): Boolean;
 var
-  RS: TResourceStream;
+  RS: TStream;
   Bytes: TBytes;
-  ResHandle: HRSRC;
-  UResName: string;
 begin
   AJson := '';
-//  Result := False;
-  UResName := UpperCase(Trim(AResName));
-
-  // Check whether resource RT_RCDATA exists in HInstance or MainInstance before loading
-  ResHandle := FindResource(HInstance, PChar(UResName), RT_RCDATA);
-  if ResHandle = 0 then
-    ResHandle := FindResource(MainInstance, PChar(UResName), RT_RCDATA);
-
-  if ResHandle = 0 then
-  begin
-    AJson := '';
+  RS := OpenRcData(UpperCase(Trim(AResName)));
+  if RS = nil then
     Exit(False);
-  end;
 
   try
-    RS := TResourceStream.Create(HInstance, UResName, RT_RCDATA);
     try
       SetLength(Bytes, RS.Size);
       if RS.Size > 0 then

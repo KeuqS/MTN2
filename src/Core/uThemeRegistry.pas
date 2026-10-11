@@ -82,8 +82,7 @@ implementation
 uses
   System.SysUtils, System.Classes, System.IOUtils, System.Generics.Collections,
   System.Generics.Defaults,
-  Winapi.Windows,
-  uConfigLocation, uDataTheme, uColorCoding, uMarkdownColors;
+  uResourceAccess, uConfigLocation, uDataTheme, uColorCoding, uMarkdownColors;
 
 const
   cDefaultThemeId = 'NDN';
@@ -119,15 +118,15 @@ end;
 
 function TryLoadResourceText(const AResName: string; out AText: string): Boolean;
 var
-  RS: TResourceStream;
+  RS: TStream;
   Bytes: TBytes;
 begin
   AText := '';
   Result := False;
-  if FindResource(HInstance, PChar(AResName), RT_RCDATA) = 0 then
+  RS := OpenRcData(AResName);
+  if RS = nil then
     Exit;
   try
-    RS := TResourceStream.Create(HInstance, AResName, RT_RCDATA);
     try
       SetLength(Bytes, RS.Size);
       if RS.Size > 0 then

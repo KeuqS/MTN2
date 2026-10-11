@@ -103,7 +103,7 @@ var
   Cell: TCharCell;
 begin
   Assert.IsTrue(TryParseDialogJson(
-    TFile.ReadAllText('..\..\dialogs\colorcodingedit.json', TEncoding.UTF8), Decl),
+    TFile.ReadAllText('../../dialogs/colorcodingedit.json', TEncoding.UTF8), Decl),
     'colorcodingedit.json failed to parse');
   FgIdx := FindControlById(Decl, 'cc_normal_fg');
   Assert.IsTrue(FgIdx >= 0, 'cc_normal_fg not found');
@@ -135,7 +135,7 @@ var
   NormalCell, SelectedCell, CurrentCell: TCharCell;
 begin
   Assert.IsTrue(TryParseDialogJson(
-    TFile.ReadAllText('..\..\dialogs\colorcodingedit.json', TEncoding.UTF8), Decl),
+    TFile.ReadAllText('../../dialogs/colorcodingedit.json', TEncoding.UTF8), Decl),
     'colorcodingedit.json failed to parse');
   // All 6 Fg/Bg fields left blank - every channel on every row should fall
   // back to that row's theme-resolved color, not the generic gray.
@@ -175,7 +175,7 @@ var
   Before, After: string;
 begin
   Assert.IsTrue(TryParseDialogJson(
-    TFile.ReadAllText('..\..\dialogs\colorpicker.json', TEncoding.UTF8), Decl),
+    TFile.ReadAllText('../../dialogs/colorpicker.json', TEncoding.UTF8), Decl),
     'colorpicker.json failed to parse');
   Idx := FindControlById(Decl, 'picker');
   Assert.IsTrue(Idx >= 0, 'picker not found');
@@ -229,7 +229,7 @@ var
   Fired: string;
 begin
   Assert.IsTrue(TryParseDialogJson(
-    TFile.ReadAllText('..\..\dialogs\markdowncolors.json', TEncoding.UTF8), Decl),
+    TFile.ReadAllText('../../dialogs/markdowncolors.json', TEncoding.UTF8), Decl),
     'markdowncolors.json failed to parse');
   Idx := FindControlById(Decl, 'md_h1_fg');
   Assert.IsTrue((Idx >= 0) and Decl.Controls[Idx].ColorPick, 'the color field has a pick button');
@@ -266,7 +266,7 @@ var
   Ch: Char;
 begin
   Assert.IsTrue(TryParseDialogJson(
-    TFile.ReadAllText('..\..\dialogs\markdowncolors.json', TEncoding.UTF8), Decl),
+    TFile.ReadAllText('../../dialogs/markdowncolors.json', TEncoding.UTF8), Decl),
     'markdowncolors.json failed to parse');
   Smp := FindControlById(Decl, 'md_h1_sample');
   Lst := FindControlById(Decl, 'md_h1_style');
@@ -306,7 +306,7 @@ var
   R: TRectI;
 begin
   Assert.IsTrue(TryParseDialogJson(
-    TFile.ReadAllText('..\..\dialogs\markdowncolors.json', TEncoding.UTF8), Decl),
+    TFile.ReadAllText('../../dialogs/markdowncolors.json', TEncoding.UTF8), Decl),
     'markdowncolors.json failed to parse');
   Smp := FindControlById(Decl, 'md_bold_sample');
   Txt := FindControlById(Decl, 'md_text_fg');

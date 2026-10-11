@@ -38,8 +38,8 @@ function RunSelfCheckToStdOut: Integer;
 implementation
 
 uses
-  Winapi.Windows, System.SysUtils, System.Classes, System.IOUtils,
-  System.JSON, uStrings, uPluginManifest;
+  System.SysUtils, System.Classes, System.IOUtils,
+  System.JSON, uStrings, uPluginManifest, uResourceAccess, uPlatformInfo;
 
 const
   cRequiredResources: array[0..3] of string =
@@ -62,23 +62,27 @@ end;
 
 function ResourceSize(const AName: string): Cardinal;
 var
-  Res: HRSRC;
+  RS: TStream;
 begin
-  Res := FindResource(HInstance, PChar(AName), RT_RCDATA);
-  if Res = 0 then
+  RS := OpenRcData(AName);
+  if RS = nil then
     Exit(0);
-  Result := SizeofResource(HInstance, Res);
+  try
+    Result := RS.Size;
+  finally
+    RS.Free;
+  end;
 end;
 
 function ResourceText(const AName: string; out AText: string): Boolean;
 var
-  RS: TResourceStream;
+  RS: TStream;
   Bytes: TBytes;
 begin
   AText := '';
-  if FindResource(HInstance, PChar(AName), RT_RCDATA) = 0 then
+  RS := OpenRcData(AName);
+  if RS = nil then
     Exit(False);
-  RS := TResourceStream.Create(HInstance, AName, RT_RCDATA);
   try
     SetLength(Bytes, RS.Size);
     if RS.Size > 0 then
@@ -104,15 +108,6 @@ begin
   end;
 end;
 
-function EnumResNameProc(AModule: HMODULE; AType, AName: PChar;
-  AParam: NativeInt): BOOL; stdcall;
-begin
-  // Named resources only; an integer id arrives as a pointer below 64K.
-  if (NativeUInt(AName) shr 16) <> 0 then
-    TStringList(AParam).Add(UpperCase(AName));
-  Result := True;
-end;
-
 procedure CheckResources(var AReport: TSelfCheckReport);
 var
   Names: TStringList;
@@ -131,7 +126,7 @@ begin
   Locales := 0;
   Names := TStringList.Create;
   try
-    EnumResourceNames(HInstance, RT_RCDATA, @EnumResNameProc, NativeInt(Names));
+    ListRcDataNames('', Names);
     for Name in Names do
     begin
       if Name.StartsWith('DIALOG_') then
@@ -166,9 +161,9 @@ begin
     Index := TPath.Combine(TPath.Combine(TPath.Combine(AAppDir, 'help'),
       LowerCase(Locale)), 'index.md');
     if TFile.Exists(Index) then
-      Add(AReport, 'OK  ', 'help\' + LowerCase(Locale) + '\index.md')
+      Add(AReport, 'OK  ', 'help' + PathDelim + LowerCase(Locale) + PathDelim + 'index.md')
     else
-      Add(AReport, 'FAIL', 'help\' + LowerCase(Locale) + '\index.md is missing');
+      Add(AReport, 'FAIL', 'help' + PathDelim + LowerCase(Locale) + PathDelim + 'index.md is missing');
   end;
 end;
 
@@ -176,17 +171,12 @@ procedure CheckDll(const AAppDir, AName: string; ARequired: Boolean;
   var AReport: TSelfCheckReport);
 var
   Path: string;
-  Handle: HMODULE;
+  Loads: Boolean;
 begin
   Path := TPath.Combine(AAppDir, AName);
-  Handle := 0;
-  if TFile.Exists(Path) then
-    Handle := LoadLibrary(PChar(Path));
-  if Handle <> 0 then
-  begin
-    FreeLibrary(Handle);
-    Add(AReport, 'OK  ', AName);
-  end
+  Loads := TFile.Exists(Path) and PlatformCanLoadLibrary(Path);
+  if Loads then
+    Add(AReport, 'OK  ', AName)
   else if ARequired then
     Add(AReport, 'FAIL', AName + ' is missing or does not load')
   else
@@ -202,7 +192,7 @@ begin
   Root := TPath.Combine(AAppDir, 'plugins');
   if not TDirectory.Exists(Root) then
   begin
-    Add(AReport, 'FAIL', 'plugins\ is missing');
+    Add(AReport, 'FAIL', 'plugins' + PathDelim + ' is missing');
     Exit;
   end;
   for Dir in TDirectory.GetDirectories(Root) do
@@ -210,23 +200,23 @@ begin
     Id := ExtractFileName(Dir);
     if not TryReadPluginManifest(Dir, Manifest) then
     begin
-      Add(AReport, 'FAIL', 'plugins\' + Id + '\plugin.json is missing or invalid');
+      Add(AReport, 'FAIL', 'plugins' + PathDelim + Id + PathDelim + 'plugin.json is missing or invalid');
       Continue;
     end;
     if not SameText(Manifest.Id, Id) then
     begin
-      Add(AReport, 'FAIL', Format('plugins\%s\plugin.json names id "%s"', [Id, Manifest.Id]));
+      Add(AReport, 'FAIL', Format('plugins%s%s%splugin.json names id "%s"', [PathDelim, Id, PathDelim, Manifest.Id]));
       Continue;
     end;
     Modules := 0;
     for FileName in TDirectory.GetFiles(Dir) do
     begin
       Ext := LowerCase(TPath.GetExtension(FileName));
-      if (Ext = '.dll') or (Ext = '.wasm') or (Ext = '.wat') then
+      if (Ext = PlatformSharedLibExt) or (Ext = '.wasm') or (Ext = '.wat') then
         Inc(Modules);
     end;
     if Modules = 0 then
-      Add(AReport, 'FAIL', 'plugins\' + Id + '\ has no module (*.dll, *.wasm, *.wat)')
+      Add(AReport, 'FAIL', 'plugins' + PathDelim + Id + PathDelim + ' has no module (*' + PlatformSharedLibExt + ', *.wasm, *.wat)')
     else
       Add(AReport, 'OK  ', 'plugin ' + Id);
   end;
@@ -244,8 +234,10 @@ begin
       case Step of
         0: CheckResources(AReport);
         1: CheckHelp(AAppDir, AReport);
-        2: CheckDll(AAppDir, 'sk4d.dll', True, AReport);
-        3: CheckDll(AAppDir, 'wasmtime.dll', False, AReport);
+        2:
+          if PlatformRenderLibrary <> '' then
+            CheckDll(AAppDir, PlatformRenderLibrary, True, AReport);
+        3: CheckDll(AAppDir, PlatformSharedLibName('wasmtime'), False, AReport);
         4: CheckPlugins(AAppDir, AReport);
       end;
     except
@@ -258,28 +250,6 @@ begin
       Result := False;
 end;
 
-procedure WriteStdOut(const AText: string);
-var
-  Handle: THandle;
-  Bytes: TBytes;
-  Written: DWORD;
-begin
-  // A GUI-subsystem exe has no console of its own: stdout is whatever the
-  // caller redirected, else the parent's console if there is one.
-  Handle := GetStdHandle(STD_OUTPUT_HANDLE);
-  if (Handle = 0) or (Handle = INVALID_HANDLE_VALUE) then
-  begin
-    if not AttachConsole(ATTACH_PARENT_PROCESS) then
-      Exit;
-    Handle := GetStdHandle(STD_OUTPUT_HANDLE);
-    if (Handle = 0) or (Handle = INVALID_HANDLE_VALUE) then
-      Exit;
-  end;
-  Bytes := TEncoding.UTF8.GetBytes(AText);
-  if Length(Bytes) > 0 then
-    WriteFile(Handle, Bytes[0], Length(Bytes), Written, nil);
-end;
-
 function RunSelfCheckToStdOut: Integer;
 var
   Report: TSelfCheckReport;
@@ -290,7 +260,7 @@ begin
     Report := Report + ['self-check passed']
   else
     Report := Report + ['self-check FAILED'];
-  WriteStdOut(string.Join(sLineBreak, Report) + sLineBreak);
+  PlatformWriteStdOut(string.Join(sLineBreak, Report) + sLineBreak);
   if Ok then
     Result := 0
   else

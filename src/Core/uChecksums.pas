@@ -306,7 +306,7 @@ begin
       if Assigned(ACancelled) and ACancelled() then
         Exit(False);
       Item.RelName := Name;
-      Path := TPath.Combine(Dir, StringReplace(Name, '/', '\', [rfReplaceAll]));
+      Path := TPath.Combine(Dir, StringReplace(Name, '/', PathDelim, [rfReplaceAll]));
       if not TFile.Exists(Path) then
         Item.Status := cvsMissing
       else

@@ -26,8 +26,9 @@ type
 implementation
 
 uses
+  uTestPaths,
   System.SysUtils, System.UITypes, System.Classes, System.IOUtils,
-  System.Generics.Collections, Winapi.Windows,
+  System.Generics.Collections, uPlatformInfo,
   uVfsTypes,
   uTerminalTypes,
   uThemeTypes,
@@ -39,13 +40,13 @@ uses
 
 procedure WaitWhile(AFunc: TFunc<Boolean>; ATimeoutMs: Cardinal = 20000);
 var
-  Tick: Cardinal;
+  Tick: UInt64;
 begin
-  Tick := GetTickCount;
+  Tick := PlatformTickCount64;
   while AFunc() do
   begin
     CheckSynchronize(20);
-    if GetTickCount - Tick > ATimeoutMs then
+    if PlatformTickCount64 - Tick > ATimeoutMs then
       raise Exception.Create('timeout waiting for the async search to finish');
   end;
   CheckSynchronize;
@@ -195,7 +196,7 @@ begin
   TDirectory.CreateDirectory(TPath.Combine(TempDir, 'sub'));
   TFile.WriteAllText(TPath.Combine(TempDir, 'a.txt'), 'hello');
   TFile.WriteAllText(TPath.Combine(TempDir, 'b.txt'), 'world');
-  TFile.WriteAllText(TPath.Combine(TempDir, 'sub\c.txt'), 'nested');
+  TFile.WriteAllText(TPath.Combine(TempDir, NativePath('sub/c.txt')), 'nested');
   TFile.WriteAllText(TPath.Combine(TempDir, 'skip.dat'), 'not a match');
 
   C := MakeController;
@@ -229,7 +230,7 @@ begin
     HasAll3 :=
       (TArray.IndexOf<string>(FoundPaths, TPath.Combine(TempDir, 'a.txt')) >= 0) and
       (TArray.IndexOf<string>(FoundPaths, TPath.Combine(TempDir, 'b.txt')) >= 0) and
-      (TArray.IndexOf<string>(FoundPaths, TPath.Combine(TempDir, 'sub\c.txt')) >= 0);
+      (TArray.IndexOf<string>(FoundPaths, TPath.Combine(TempDir, NativePath('sub/c.txt'))) >= 0);
     Assert.IsTrue(HasAll3, 'all 3 expected files are present in Results');
     Assert.IsTrue(C.State.Cursor = 0, 'cursor starts at the first result');
 

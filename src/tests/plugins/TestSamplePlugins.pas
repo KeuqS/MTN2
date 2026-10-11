@@ -37,6 +37,7 @@ type
 implementation
 
 uses
+  uTestPaths,
   System.SysUtils, System.Classes, System.IOUtils, System.UITypes,
   Winapi.Windows, Winapi.Messages,
   uCommandRegistry, uDocumentProviders, uPluginChrome, uPluginUi, uDialogTypes,
@@ -50,7 +51,7 @@ var
 function BuiltSample(const AId: string): string;
 begin
   Result := ExpandFileName(TPath.Combine(ExtractFilePath(ParamStr(0)),
-    '..\..\..\samples\.build\' + AId));
+    NativePath('../../../samples/.build/') + AId));
 end;
 
 procedure InstallDialogHost;
@@ -500,7 +501,7 @@ begin
   TDirectory.CreateDirectory(TPath.Combine(Root, 'sub'));
   TFile.WriteAllText(TPath.Combine(Root, 'a.txt'), 'a');
   TFile.WriteAllText(TPath.Combine(Root, 'b.txt'), 'bb');
-  TFile.WriteAllText(TPath.Combine(Root, 'sub\c.txt'), 'ccc');
+  TFile.WriteAllText(TPath.Combine(Root, NativePath('sub/c.txt')), 'ccc');
   InstallFakeServices;
   try
     Assert.IsTrue(StageAndLoad('mtn.demo.panelkit'), 'the panel tools plugin loads');
@@ -855,11 +856,11 @@ begin
   try
     // The same module with the manifest line removed must not load: WASI is
     // available only to a plugin that asks for it.
-    TDirectory.CreateDirectory(TPath.Combine(ExtractFilePath(ParamStr(0)), 'plugins-sample-nowasi\mtn.demo.go.wasm'));
+    TDirectory.CreateDirectory(TPath.Combine(ExtractFilePath(ParamStr(0)), NativePath('plugins-sample-nowasi/mtn.demo.go.wasm')));
     TFile.Copy(TPath.Combine(BuiltSample('mtn.demo.go.wasm'), 'plugin.wasm'),
-      TPath.Combine(ExtractFilePath(ParamStr(0)), 'plugins-sample-nowasi\mtn.demo.go.wasm\plugin.wasm'), True);
+      TPath.Combine(ExtractFilePath(ParamStr(0)), NativePath('plugins-sample-nowasi/mtn.demo.go.wasm/plugin.wasm')), True);
     TFile.WriteAllText(TPath.Combine(ExtractFilePath(ParamStr(0)),
-      'plugins-sample-nowasi\mtn.demo.go.wasm\plugin.json'),
+      NativePath('plugins-sample-nowasi/mtn.demo.go.wasm/plugin.json')),
       '{"id":"mtn.demo.go.wasm","abi":2}', TEncoding.UTF8);
     PluginLoader.UnloadAll;
     PluginLoader.LoadPluginsFrom(TPath.Combine(ExtractFilePath(ParamStr(0)), 'plugins-sample-nowasi'));

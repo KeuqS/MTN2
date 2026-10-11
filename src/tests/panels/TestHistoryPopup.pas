@@ -15,12 +15,13 @@ type
   public
     [SetupFixture] procedure SetupFixture;
     [Test] procedure TestPopup;
-    [Test] procedure TestPathCompletion;
+    [Test] [Category('WindowsOnly')] procedure TestPathCompletion;
   end;
 
 implementation
 
 uses
+  uTestPaths,
   System.SysUtils, System.Classes, System.UITypes, System.IOUtils,
   uTerminalTypes, uThemeTypes, uHistoryPopup, uDualPanelCmd;
 
@@ -111,9 +112,9 @@ begin
   Dir := TPath.Combine(TPath.GetTempPath, 'mtn2-cmdpath-test');
   if TDirectory.Exists(Dir) then
     TDirectory.Delete(Dir, True);
-  ForceDirectories(TPath.Combine(Dir, 'src\Core'));
+  ForceDirectories(TPath.Combine(Dir, NativePath('src/Core')));
   ForceDirectories(TPath.Combine(Dir, 'Scripts'));
-  TFile.WriteAllText(TPath.Combine(Dir, 'src\sample.txt'), '');
+  TFile.WriteAllText(TPath.Combine(Dir, NativePath('src/sample.txt')), '');
   TFile.WriteAllText(TPath.Combine(Dir, 'setup.exe'), '');
   try
     Assert.IsTrue(not CmdLineTokenIsPath('src'), 'bare name is not a path (panel names)');

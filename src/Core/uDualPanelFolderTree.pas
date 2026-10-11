@@ -29,7 +29,7 @@ interface
 uses
   System.SysUtils, System.Classes, System.UITypes, System.Math,
   System.Generics.Collections, System.Generics.Defaults, System.Threading,
-  FMX.Types,
+  uCoreTimer,
   uTerminalTypes, uThemeTypes, uThemeDrawing, uDualPanelTypes,
   uDualPanelOverlays, uDualPanelDrawUtils, uDualPanelPanelDraw;
 
@@ -129,7 +129,7 @@ type
     FSide: TPanelSide;
     FBounds: TRectI;
     FScroll: Integer;
-    FFollowTimer: TTimer;
+    FFollowTimer: TCoreTimer;
     FFollowed: string;
     /// <summary>Panel folder the tree was opened over.</summary>
     FOwnerUri: string;
@@ -571,7 +571,7 @@ begin
   if not Assigned(FList) then
     FList := ListLocalSubfolders;
   FTree := TFolderTree.Create(FList);
-  FFollowTimer := TTimer.Create(nil);
+  FFollowTimer := TCoreTimer.Create(nil);
   FFollowTimer.Enabled := False;
   FFollowTimer.Interval := cFolderTreeFollowMs;
   FFollowTimer.OnTimer := FollowTick;

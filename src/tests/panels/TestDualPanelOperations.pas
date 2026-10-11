@@ -9,7 +9,7 @@ type
   [TestFixture]
   TTestDualPanelOperations = class
   public
-    [Test] procedure TestFolderSegments;
+    [Test] [Category('WindowsOnly')] procedure TestFolderSegments;
     [Test] procedure TestRenameName;
     [Test] procedure TestClassifyActivateCurrent;
   end;

@@ -117,7 +117,7 @@ implementation
 uses
   System.Classes, System.Rtti, System.SyncObjs, System.Math, System.Generics.Collections,
   System.JSON,
-  FMX.Platform, FMX.Types,
+  uClipboardService,
   uNotice, uStrings, uUpdater;
 
 type
@@ -220,26 +220,15 @@ begin
 end;
 
 function PluginClipboardGet(out AText: string): Boolean;
-var
-  Svc: IFMXClipboardService;
-  V: TValue;
 begin
-  AText := '';
-  if not TPlatformServices.Current.SupportsPlatformService(IFMXClipboardService, Svc) then
-    Exit(False);
-  V := Svc.GetClipboard;
-  if not V.IsEmpty and V.IsType<string> then
-    AText := V.AsString;
+  if not TryGetClipboardText(AText) then
+    AText := '';
   Result := AText <> '';
 end;
 
 function PluginClipboardSet(const AText: string): Boolean;
-var
-  Svc: IFMXClipboardService;
 begin
-  Result := TPlatformServices.Current.SupportsPlatformService(IFMXClipboardService, Svc);
-  if Result then
-    Svc.SetClipboard(AText);
+  Result := TrySetClipboardText(AText);
 end;
 
 procedure PluginShowMessage(const AText: string; AKind: Integer);

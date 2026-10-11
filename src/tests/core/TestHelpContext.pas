@@ -20,6 +20,7 @@ type
 implementation
 
 uses
+  uTestPaths,
   System.SysUtils,
   System.IOUtils,
   uDualPanelTypes,
@@ -44,7 +45,7 @@ end;
 function HelpDir(const ALang: string): string;
 begin
   Result := TPath.GetFullPath(TPath.Combine(ExtractFilePath(ParamStr(0)),
-    '..\..\..\bin\help\' + ALang)); // exe in src\tests\dcu
+    NativePath('../../../bin/help/') + ALang)); // exe in src\tests\dcu
 end;
 
 procedure TestScreens;

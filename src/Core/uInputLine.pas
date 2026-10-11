@@ -99,8 +99,7 @@ procedure InputLineMouseClick(var A: TInputLine; ARelCol, AClickCount: Integer;
 implementation
 
 uses
-  {$IFDEF MSWINDOWS}Winapi.Windows,{$ENDIF}
-  System.Rtti, System.Character, FMX.Platform, uKeyChord;
+  System.Rtti, System.Character, uClipboardService, uPlatformInfo, uKeyChord;
 
 procedure Clamp(var A: TInputLine);
 begin
@@ -267,11 +266,7 @@ var
   NowTick, Limit: Cardinal;
 begin
   NowTick := TThread.GetTickCount;
-  {$IFDEF MSWINDOWS}
-  Limit := GetDoubleClickTime;
-  {$ELSE}
-  Limit := 500;
-  {$ENDIF}
+  Limit := PlatformDoubleClickMs;
   if (Count > 0) and (Count < 3) and (AX = LastX) and (AY = LastY) and
      (NowTick - LastTick <= Limit) then
     Inc(Count)
@@ -337,24 +332,13 @@ begin
 end;
 
 function ClipboardGet: string;
-var
-  Svc: IFMXClipboardService;
-  V: TValue;
 begin
-  Result := '';
-  if not TPlatformServices.Current.SupportsPlatformService(IFMXClipboardService, Svc) then
-    Exit;
-  V := Svc.GetClipboard;
-  if not V.IsEmpty and V.IsType<string> then
-    Result := V.AsString;
+  Result := GetClipboardText;
 end;
 
 procedure ClipboardSet(const AText: string);
-var
-  Svc: IFMXClipboardService;
 begin
-  if TPlatformServices.Current.SupportsPlatformService(IFMXClipboardService, Svc) then
-    Svc.SetClipboard(AText);
+  SetClipboardText(AText);
 end;
 
 function InputLineEmpty: TInputLine;

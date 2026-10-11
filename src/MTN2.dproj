@@ -71,7 +71,7 @@
     <PropertyGroup Condition="'$(Base)'!=''">
         <DCC_DcuOutput>..\dcu\$(Platform)\$(Config)</DCC_DcuOutput>
         <DCC_ExeOutput>..\bin</DCC_ExeOutput>
-        <DCC_UnitSearchPath>.\Core;.\Forms;$(DCC_UnitSearchPath)</DCC_UnitSearchPath>
+        <DCC_UnitSearchPath>.\Core;.\Forms;.\Platform\Windows;$(DCC_UnitSearchPath)</DCC_UnitSearchPath>
         <DCC_E>false</DCC_E>
         <DCC_N>false</DCC_N>
         <DCC_S>false</DCC_S>
@@ -201,6 +201,21 @@
             <MainSource>MainSource</MainSource>
         </DelphiCompile>
         <DCCReference Include="Core\uCharWidth.pas"/>
+        <DCCReference Include="Platform\Windows\uPlatformProcess.pas"/>
+        <DCCReference Include="Core\uFileAttrTypes.pas"/>
+        <DCCReference Include="Platform\Windows\uPlatformFileAttr.pas"/>
+        <DCCReference Include="Platform\Windows\uPlatformHostInfo.pas"/>
+        <DCCReference Include="Platform\Windows\uPlatformFolders.pas"/>
+        <DCCReference Include="Platform\Windows\uPlatformFileOps.pas"/>
+        <DCCReference Include="Core\uDriveTypes.pas"/>
+        <DCCReference Include="Platform\Windows\uPlatformDrives.pas"/>
+        <DCCReference Include="Platform\Windows\uPlatformUpdate.pas"/>
+        <DCCReference Include="Platform\Windows\uPlatformPaths.pas"/>
+        <DCCReference Include="Platform\Windows\uPlatformInfo.pas"/>
+        <DCCReference Include="Platform\Windows\uPlatformFonts.pas"/>
+        <DCCReference Include="Core\uClipboardService.pas"/>
+        <DCCReference Include="Hosts\Fmx\uFmxClipboard.pas"/>
+        <DCCReference Include="Platform\Windows\uResourceAccess.pas"/>
         <DCCReference Include="Core\uTerminalTypes.pas"/>
         <DCCReference Include="Core\uConfigLocation.pas"/>
         <DCCReference Include="Core\uFolderHistory.pas"/>
@@ -242,7 +257,7 @@
         <DCCReference Include="Core\uPanelColumns.pas"/>
         <DCCReference Include="Core\uDisplaySettings.pas"/>
         <DCCReference Include="Core\uChromeRows.pas"/>
-        <DCCReference Include="Core\uDirWatch.pas"/>
+        <DCCReference Include="Platform\Windows\uDirWatch.pas"/>
         <DCCReference Include="Core\uDialogTypes.pas"/>
         <DCCReference Include="Core\uDialogJson.pas"/>
         <DCCReference Include="Core\uDialogResources.pas"/>
@@ -295,11 +310,12 @@
         <DCCReference Include="Core\uVfsRegistry.pas"/>
         <DCCReference Include="Core\uVfsRouter.pas"/>
         <DCCReference Include="Core\uDriveInfo.pas"/>
-        <DCCReference Include="Core\uShellAssoc.pas"/>
+        <DCCReference Include="Platform\Windows\uShellAssoc.pas"/>
         <DCCReference Include="Core\uConsoleLaunch.pas"/>
-        <DCCReference Include="Core\uShellIcons.pas"/>
+        <DCCReference Include="Platform\Windows\uShellIcons.pas"/>
         <DCCReference Include="Core\uColorCoding.pas"/>
-        <DCCReference Include="Core\uOverlayRenderer.pas"/>
+        <DCCReference Include="Core\uImageInfo.pas"/>
+        <DCCReference Include="Platform\Windows\uOverlayRenderer.pas"/>
         <DCCReference Include="Core\uAssociations.pas"/>
         <DCCReference Include="Core\uKeymap.pas"/>
         <DCCReference Include="Core\uEditorDoc.pas"/>
@@ -314,8 +330,8 @@
         <DCCReference Include="Core\uDualPanelOperations.pas"/>
         <DCCReference Include="Core\uConsoleBuffer.pas"/>
         <DCCReference Include="Core\uANSIParser.pas"/>
-        <DCCReference Include="Core\uConPty.pas"/>
-        <DCCReference Include="Core\uShellProfiles.pas"/>
+        <DCCReference Include="Platform\Windows\uConPty.pas"/>
+        <DCCReference Include="Platform\Windows\uShellProfiles.pas"/>
         <DCCReference Include="Core\uBaseConsoleWindow.pas"/>
         <DCCReference Include="Core\uConsoleWindow.pas"/>
         <DCCReference Include="Core\uTerminalWorkspace.pas"/>
@@ -327,12 +343,15 @@
         <DCCReference Include="Core\uThemeRegistry.pas"/>
         <DCCReference Include="Core\uThemeProxy.pas"/>
         <DCCReference Include="Core\uTerminalRenderer.pas"/>
-        <DCCReference Include="Core\uWinFileDragDrop.pas"/>
+        <DCCReference Include="Core\uFileClip.pas"/>
+        <DCCReference Include="Core\uCoreTimer.pas"/>
+        <DCCReference Include="Hosts\Fmx\uFmxTimer.pas"/>
+        <DCCReference Include="Platform\Windows\uWinFileDragDrop.pas"/>
         <DCCReference Include="Core\uWinFileAttr.pas"/>
-        <DCCReference Include="Core\uSingleInstance.pas"/>
+        <DCCReference Include="Platform\Windows\uSingleInstance.pas"/>
         <DCCReference Include="Core\uUpdater.pas"/>
         <DCCReference Include="Core\uSelfCheck.pas"/>
-        <DCCReference Include="Core\uElevatedHelper.pas"/>
+        <DCCReference Include="Platform\Windows\uElevatedHelper.pas"/>
         <DCCReference Include="Core\uUpdateController.pas"/>
         <DCCReference Include="Core\uNotice.pas"/>
         <DCCReference Include="Core\uHiddenDialogs.pas"/>

@@ -6,7 +6,7 @@ interface
 
 uses
   System.SysUtils, System.Classes, System.UITypes, System.Math, System.IOUtils,
-  Winapi.Windows,
+  uPlatformInfo, uPlatformFileOps,
   uTerminalTypes, uThemeTypes, uDualPanelTypes, uDualPanelUiTypes,
   uDualPanelOverlays, uDualPanelJobRules, uVfsTypes, uFileFind, uJobPopupRenderer,
   uStrings, uElevation, uFileRecycleBin;
@@ -598,15 +598,8 @@ begin
 end;
 
 function TPanelJobController.PathIsReparsePoint(const APath: string): Boolean;
-var
-  Attr: DWORD;
 begin
-  Result := False;
-  if APath = '' then
-    Exit;
-  Attr := GetFileAttributes(PChar(WinApiPath(APath)));
-  Result := (Attr <> INVALID_FILE_ATTRIBUTES) and
-    ((Attr and FILE_ATTRIBUTE_REPARSE_POINT) <> 0);
+  Result := (APath <> '') and PlatformIsReparsePoint(APath);
 end;
 
 procedure TPanelJobController.AdvanceJobAfterItem(AIndex: Integer);
@@ -899,10 +892,10 @@ const
   cMinInvalidateMs = 50; // ~20 Hz full Recompose while a transfer runs
 begin
   FProgressInvalidateDirty := True;
-  if (GetTickCount64 - FLastProgressInvalidateTick) >= cMinInvalidateMs then
+  if (PlatformTickCount64 - FLastProgressInvalidateTick) >= cMinInvalidateMs then
   begin
     FProgressInvalidateDirty := False;
-    FLastProgressInvalidateTick := GetTickCount64;
+    FLastProgressInvalidateTick := PlatformTickCount64;
     if Assigned(FOnInvalidate) then
       FOnInvalidate;
     Exit;
@@ -919,7 +912,7 @@ begin
       if FJob.Phase <> pjpRunning then
         Exit;
       FProgressInvalidateDirty := False;
-      FLastProgressInvalidateTick := GetTickCount64;
+      FLastProgressInvalidateTick := PlatformTickCount64;
       if Assigned(FOnInvalidate) then
         FOnInvalidate;
     end, cMinInvalidateMs);
@@ -1267,8 +1260,7 @@ begin
   if Result = '' then
     case AError.Code of
       vecAccessDenied:
-        Result := Format('0x%8.8x - %s', [ERROR_ACCESS_DENIED,
-          SysErrorMessage(ERROR_ACCESS_DENIED)]);
+        Result := PlatformAccessDeniedText;
       vecNotFound:
         Result := 'Path not found';
       vecCancelled:
@@ -1279,8 +1271,7 @@ begin
   else if AError.Code = vecAccessDenied then
   begin
     if Pos('Access denied', Result) = 1 then
-      Result := Format('0x%8.8x - %s', [ERROR_ACCESS_DENIED,
-        SysErrorMessage(ERROR_ACCESS_DENIED)]);
+      Result := PlatformAccessDeniedText;
   end;
 end;
 
@@ -1779,9 +1770,9 @@ begin
           Inc(Copied, N);
           CapDone := Copied;
           CapTotal := Total;
-          if ((Copied >= Total) or (GetTickCount64 - LastProgTick >= 50)) then
+          if ((Copied >= Total) or (PlatformTickCount64 - LastProgTick >= 50)) then
           begin
-            LastProgTick := GetTickCount64;
+            LastProgTick := PlatformTickCount64;
             TThread.Queue(nil,
               procedure
               begin

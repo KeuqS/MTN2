@@ -9,7 +9,7 @@ interface
 
 uses
   System.SysUtils, System.IOUtils,
-  uVfsTypes, uFolderHotlist, uPanelColumns;
+  uVfsTypes, uFolderHotlist, uPanelColumns, uPlatformFolders;
 
 function HomeUri: string;
 function DocumentsUri: string;
@@ -50,15 +50,12 @@ end;
 
 function DocumentsUri: string;
 begin
-  Result := PathToFileUri(TPath.GetDocumentsPath);
+  Result := PathToFileUri(PlatformDocumentsDir);
 end;
 
 function ProjectsUri: string;
 begin
-  if TDirectory.Exists('D:\Work') then
-    Result := PathToFileUri('D:\Work')
-  else
-    Result := HomeUri;
+  Result := PathToFileUri(PlatformProjectsDir);
 end;
 
 function PanelItemFullPath(const AURI, APanelURI: string; AIsParent: Boolean): string;

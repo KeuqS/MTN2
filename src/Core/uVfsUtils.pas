@@ -26,10 +26,8 @@ type
 
 implementation
 
-{$IFDEF MSWINDOWS}
 uses
-  Winapi.Windows;
-{$ENDIF}
+  uPlatformInfo;
 
 // One non-digit run of each name. Whole runs, never single chars mixed with
 // an ASCII fast path: per-char "ASCII ordinal, else locale" is not
@@ -41,18 +39,8 @@ function CompareTextRun(const ALeft: string; ALeftStart, ALeftLen: Integer;
 begin
   if (ALeftLen = 0) or (ARightLen = 0) then
     Exit(Ord(ALeftLen > 0) - Ord(ARightLen > 0));
-{$IFDEF MSWINDOWS}
-  Result := CompareStringW(LOCALE_USER_DEFAULT, NORM_IGNORECASE or SORT_STRINGSORT,
-    PChar(ALeft) + ALeftStart - 1, ALeftLen,
-    PChar(ARight) + ARightStart - 1, ARightLen) - CSTR_EQUAL;
-{$ELSE}
-  Result := CompareText(Copy(ALeft, ALeftStart, ALeftLen),
-    Copy(ARight, ARightStart, ARightLen), TLocaleOptions.loUserLocale);
-{$ENDIF}
-  if Result < 0 then
-    Result := -1
-  else if Result > 0 then
-    Result := 1;
+  Result := PlatformCompareTextRun(ALeft, ALeftStart, ALeftLen, ARight, ARightStart,
+    ARightLen);
 end;
 
 function CompareNaturalText(const Left, Right: string): Integer;

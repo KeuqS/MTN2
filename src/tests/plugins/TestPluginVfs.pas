@@ -175,7 +175,7 @@ end;
 type
   TWaiter = class
     Done: Boolean;
-    Status: Integer;
+    Code: Integer;
     Text: string;
     Data: TBytes;
     Handle: Int64;
@@ -266,13 +266,13 @@ begin
     Assert.AreEqual(0, PluginVfsList(cId, FileUriOf(FRoot),
       procedure(AStatus: Integer; const AText: string)
       begin
-        W.Status := AStatus;
+        W.Code := AStatus;
         W.Text := AText;
         W.Done := True;
       end));
     W.Wait;
     Assert.IsTrue(W.Done, 'the callback came');
-    Assert.AreEqual(cPluginVfsOk, W.Status);
+    Assert.AreEqual(cPluginVfsOk, W.Code);
     Root := TJSONObject.ParseJSONValue(W.Text);
     try
       Entries := Root.GetValue<TJSONArray>('entries');
@@ -336,13 +336,13 @@ begin
     Assert.AreEqual(0, PluginVfsRead(cId, FileUriOf(TPath.Combine(FRoot, 'a.txt')), 0,
       procedure(AStatus: Integer; const AData: TBytes)
       begin
-        W.Status := AStatus;
+        W.Code := AStatus;
         W.Data := AData;
         W.Done := True;
       end));
     W.Wait;
     Assert.IsTrue(W.Done);
-    Assert.AreEqual(cPluginVfsOk, W.Status);
+    Assert.AreEqual(cPluginVfsOk, W.Code);
     Assert.AreEqual('hello' + #10 + 'world', TEncoding.UTF8.GetString(W.Data), 'the bytes of the file');
   finally
     W.Free;
@@ -358,12 +358,12 @@ begin
     PluginVfsRead(cId, FileUriOf(TPath.Combine(FRoot, 'none.txt')), 0,
       procedure(AStatus: Integer; const AData: TBytes)
       begin
-        W.Status := AStatus;
+        W.Code := AStatus;
         W.Done := True;
         Assert.IsTrue(Length(AData) = 0, 'no bytes with an error');
       end);
     W.Wait;
-    Assert.AreEqual(cPluginVfsNotFound, W.Status);
+    Assert.AreEqual(cPluginVfsNotFound, W.Code);
   finally
     W.Free;
   end;
@@ -378,11 +378,11 @@ begin
     PluginVfsRead(cId, FileUriOf(TPath.Combine(FRoot, 'a.txt')), 5,
       procedure(AStatus: Integer; const AData: TBytes)
       begin
-        W.Status := AStatus;
+        W.Code := AStatus;
         W.Done := True;
       end);
     W.Wait;
-    Assert.AreEqual(cPluginVfsNotSupported, W.Status, 'an 11 byte file does not fit 5 bytes');
+    Assert.AreEqual(cPluginVfsNotSupported, W.Code, 'an 11 byte file does not fit 5 bytes');
   finally
     W.Free;
   end;
@@ -624,14 +624,14 @@ begin
     Job := PluginVfsOpen(cId, AUri,
       procedure(AOpenStatus: Integer; AHandle: Int64)
       begin
-        W.Status := AOpenStatus;
+        W.Code := AOpenStatus;
         W.Handle := AHandle;
         W.Done := True;
       end);
     Assert.IsTrue(Job > 0, 'started: the number of the job');
     W.Wait;
     Assert.IsTrue(W.Done, 'the callback came');
-    AStatus := W.Status;
+    AStatus := W.Code;
     Result := W.Handle;
   finally
     W.Free;
@@ -945,7 +945,7 @@ begin
     Job := PluginVfsOpen(cId, 'fake://host/clip.mp4',
       procedure(AStatus: Integer; AHandle: Int64)
       begin
-        W.Status := AStatus;
+        W.Code := AStatus;
         W.Handle := AHandle;
         Inc(W.Calls);
         W.Done := True;
@@ -955,7 +955,7 @@ begin
     Gate.SetEvent;
     W.Wait;
     Assert.IsTrue(W.Done, 'the callback still follows');
-    Assert.AreEqual(cPluginVfsCancelled, W.Status);
+    Assert.AreEqual(cPluginVfsCancelled, W.Code);
     Assert.AreEqual(Int64(0), W.Handle, 'no handle');
     Pump(100);
     Assert.AreEqual(1, W.Calls, 'once');
@@ -978,13 +978,13 @@ begin
     Job := PluginVfsOpen(cId, LocalUri,
       procedure(AStatus: Integer; AHandle: Int64)
       begin
-        W.Status := AStatus;
+        W.Code := AStatus;
         W.Handle := AHandle;
         W.Done := True;
       end);
     Assert.AreEqual(Int64(0), PluginVfsCancel(cId, Job), 'cancelled before the callback');
     W.Wait;
-    Assert.AreEqual(cPluginVfsCancelled, W.Status);
+    Assert.AreEqual(cPluginVfsCancelled, W.Code);
     Assert.AreEqual(Int64(0), W.Handle, 'the opened file was dropped');
   finally
     W.Free;

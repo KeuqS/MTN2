@@ -10,9 +10,9 @@ type
   TTestDualPanelJobDialogs = class
   public
     [Test] procedure TestJobOptionMaps;
-    [Test] procedure TestDestAndPack;
+    [Test] [Category('WindowsOnly')] procedure TestDestAndPack;
     [Test] procedure TestCollectSources;
-    [Test] procedure TestSearchRootAndSync;
+    [Test] [Category('WindowsOnly')] procedure TestSearchRootAndSync;
   end;
 
 implementation

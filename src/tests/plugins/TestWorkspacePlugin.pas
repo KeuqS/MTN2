@@ -18,6 +18,7 @@ type
 implementation
 
 uses
+  uTestPaths,
   System.SysUtils, System.Classes, System.IOUtils, System.SyncObjs, System.TypInfo,
   Winapi.Windows,
   uVfsTypes,
@@ -45,7 +46,7 @@ uses
 function PluginSrcDir: string;
 begin
   Result := ExpandFileName(TPath.Combine(ExtractFilePath(ParamStr(0)),
-    '..\..\plugins\mtn.ws'));
+    NativePath('../../plugins/mtn.ws')));
 end;
 
 procedure WaitList(const AVfs: IVirtualFileSystem; const AURI: string;

@@ -17,6 +17,8 @@ uses
   TestConsoleBufferCmd in 'TestConsoleBufferCmd.pas',
   TestFindEncoding in 'TestFindEncoding.pas',
   TestLineBufferedBackspace in 'TestLineBufferedBackspace.pas',
+  TestPosixPty in 'TestPosixPty.pas',
+  TestPosixShellProfiles in 'TestPosixShellProfiles.pas',
   TestPrimaryScreenGrid in 'TestPrimaryScreenGrid.pas',
   TestWideChars in 'TestWideChars.pas',
   TestPsBackspaceFlow in 'TestPsBackspaceFlow.pas',

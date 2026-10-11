@@ -9,7 +9,7 @@ unit uToast;
 interface
 
 uses
-  System.SysUtils, System.UITypes, FMX.Types,
+  System.SysUtils, System.UITypes, uCoreTimer,
   uTerminalTypes, uThemeTypes, uNotice;
 
 const
@@ -21,7 +21,7 @@ type
   // point other units use to raise a toast.
   TToast = class
   private
-    FTimer: TTimer;
+    FTimer: TCoreTimer;
     FVisible: Boolean;
     FKind: TToastKind;
     FTemplate: string;
@@ -147,7 +147,7 @@ constructor TToast.Create(const AOnChanged: TProc);
 begin
   inherited Create;
   FOnChanged := AOnChanged;
-  FTimer := TTimer.Create(nil);
+  FTimer := TCoreTimer.Create(nil);
   FTimer.Enabled := False;
   FTimer.Interval := cToastDurationMs;
   FTimer.OnTimer := TimerTick;

@@ -1,13 +1,11 @@
 unit uSftpVfs;
 
 { Built-in backend for sftp://. One protocol,
-  end-to-end, per the SDS: SFTP over the system OpenSSH `sftp.exe` client in
+  end-to-end, per the SDS: SFTP over the system OpenSSH `sftp` client in
   batch mode -- no bundled network/crypto library, no plugin, same
   ssh/sftp binaries the SSH console profile (uShellProfiles.pas) already
-  requires. Cross-platform: `sftp -b -` batch-mode syntax is identical on
-  Windows/Linux/macOS OpenSSH builds; only the process-spawn plumbing below
-  (Winapi.Windows) is Windows-specific, the same seam uConPty.pas already
-  has for a future POSIX build.
+  requires. The `sftp -b -` batch-mode syntax is the same on Windows, Linux and
+  macOS OpenSSH builds; starting the process is uPlatformProcess.
 
   URI: sftp://[user@]host[:port]/remote/path -- see uVfsTypes.pas
   (IsSftpUri/SftpAuthorityOf/SftpRemotePathOf/MakeSftpUri).
@@ -76,66 +74,22 @@ implementation
 
 uses
   System.SysUtils, System.Classes, System.IOUtils, System.Generics.Collections,
-  System.DateUtils, System.StrUtils, Winapi.Windows, uShellProfiles;
+  System.DateUtils, System.StrUtils, uPlatformProcess, uShellProfiles;
 
 const
   cDefaultSftpPort = 22;
   cConnectTimeoutSec = 15;
   cListTimeoutMs = 20000;
   cTransferTimeoutMs = 30 * 60 * 1000;
-  cWaitSliceMs = 400;
   cTransientRetries = 1;
   cDefaultReadMaxBytes = 2 * 1024 * 1024;
 
-{ ---- process spawn + capture --------------------------------------------- }
-
 type
-  TSftpSpawnResult = (ssrOk, ssrSpawnFailed, ssrTimeout, ssrCancelled);
-
   TSftpFailRule = record
     Needle: string;
     Code: TVfsErrorCode;
     Friendly: string;
   end;
-
-  TPipeReaderThread = class(TThread)
-  private
-    FHandle: THandle;
-    FBuf: TBytesStream;
-  protected
-    procedure Execute; override;
-  public
-    constructor Create(AHandle: THandle);
-    destructor Destroy; override;
-    property Buf: TBytesStream read FBuf;
-  end;
-
-constructor TPipeReaderThread.Create(AHandle: THandle);
-begin
-  inherited Create(False);
-  FreeOnTerminate := False;
-  FHandle := AHandle;
-  FBuf := TBytesStream.Create;
-end;
-
-destructor TPipeReaderThread.Destroy;
-begin
-  FBuf.Free;
-  inherited;
-end;
-
-procedure TPipeReaderThread.Execute;
-var
-  Chunk: array[0..4095] of Byte;
-  N: DWORD;
-begin
-  while not Terminated do
-  begin
-    if not ReadFile(FHandle, Chunk, SizeOf(Chunk), N, nil) or (N = 0) then
-      Break;
-    FBuf.Write(Chunk, N);
-  end;
-end;
 
 function QuoteCmdArg(const S: string): string;
 begin
@@ -145,160 +99,13 @@ begin
     Result := S;
 end;
 
-procedure CloseHandleIfOpen(var AHandle: THandle);
-begin
-  if AHandle <> 0 then
-  begin
-    CloseHandle(AHandle);
-    AHandle := 0;
-  end;
-end;
-
-function CreateStdPipes(out AInRead, AInWrite, AOutRead, AOutWrite: THandle): Boolean;
-var
-  SecAttr: TSecurityAttributes;
-begin
-  Result := False;
-  AInRead := 0;
-  AInWrite := 0;
-  AOutRead := 0;
-  AOutWrite := 0;
-  FillChar(SecAttr, SizeOf(SecAttr), 0);
-  SecAttr.nLength := SizeOf(SecAttr);
-  SecAttr.bInheritHandle := True;
-  if not CreatePipe(AInRead, AInWrite, @SecAttr, 0) then
-    Exit;
-  if not SetHandleInformation(AInWrite, HANDLE_FLAG_INHERIT, 0) then
-  begin
-    CloseHandleIfOpen(AInRead);
-    CloseHandleIfOpen(AInWrite);
-    Exit;
-  end;
-  if not CreatePipe(AOutRead, AOutWrite, @SecAttr, 0) then
-  begin
-    CloseHandleIfOpen(AInRead);
-    CloseHandleIfOpen(AInWrite);
-    Exit;
-  end;
-  if not SetHandleInformation(AOutRead, HANDLE_FLAG_INHERIT, 0) then
-  begin
-    CloseHandleIfOpen(AInRead);
-    CloseHandleIfOpen(AInWrite);
-    CloseHandleIfOpen(AOutRead);
-    CloseHandleIfOpen(AOutWrite);
-    Exit;
-  end;
-  Result := True;
-end;
-
-function BuildCommandLine(const AExe: string; const AArgs: TArray<string>): string;
-var
-  Arg: string;
-begin
-  Result := QuoteCmdArg(AExe);
-  for Arg in AArgs do
-    Result := Result + ' ' + QuoteCmdArg(Arg);
-  UniqueString(Result);
-end;
-
-function WaitCapturedProcess(AProcess: THandle; ATimeoutMs: Cardinal;
-  ACancel: IJobCancelToken): TSftpSpawnResult;
-var
-  WaitRes: DWORD;
-  StartTick: UInt64;
-begin
-  StartTick := GetTickCount64;
-  repeat
-    WaitRes := WaitForSingleObject(AProcess, cWaitSliceMs);
-    if WaitRes = WAIT_OBJECT_0 then
-      Exit(ssrOk);
-    if JobCancelRequested(ACancel) then
-    begin
-      TerminateProcess(AProcess, 1);
-      Exit(ssrCancelled);
-    end;
-    if (ATimeoutMs > 0) and (GetTickCount64 - StartTick >= ATimeoutMs) then
-    begin
-      TerminateProcess(AProcess, 1);
-      Exit(ssrTimeout);
-    end;
-  until False;
-end;
-
-/// <summary>Spawns AExe with AArgs, writes AStdIn to its stdin then closes
-/// it, captures merged stdout+stderr. ATimeoutMs=0 waits until the process
-/// exits or ACancel is signalled. Timeout/cancel kill the child. A nonzero
-/// exit code is ssrOk - the caller reads AOutput to explain the failure.</summary>
-function RunCapturedProcess(const AExe: string; const AArgs: TArray<string>;
-  const AStdIn: string; ATimeoutMs: Cardinal; ACancel: IJobCancelToken;
-  out AOutput: string; out AExitCode: Cardinal): TSftpSpawnResult;
-var
-  StdInRead, StdInWrite, StdOutRead, StdOutWrite: THandle;
-  StartInfo: TStartupInfo;
-  ProcInfo: TProcessInformation;
-  CmdLine: string;
-  Reader: TPipeReaderThread;
-  BytesWritten: DWORD;
-  InBytes: TBytes;
-  OutBytes: TBytes;
-begin
-  Result := ssrSpawnFailed;
-  AOutput := '';
-  AExitCode := Cardinal(-1);
-  if not CreateStdPipes(StdInRead, StdInWrite, StdOutRead, StdOutWrite) then
-    Exit;
-
-  CmdLine := BuildCommandLine(AExe, AArgs);
-  FillChar(StartInfo, SizeOf(StartInfo), 0);
-  StartInfo.cb := SizeOf(StartInfo);
-  StartInfo.dwFlags := STARTF_USESTDHANDLES or STARTF_USESHOWWINDOW;
-  StartInfo.wShowWindow := SW_HIDE;
-  StartInfo.hStdInput := StdInRead;
-  StartInfo.hStdOutput := StdOutWrite;
-  StartInfo.hStdError := StdOutWrite;
-  FillChar(ProcInfo, SizeOf(ProcInfo), 0);
-
-  Reader := TPipeReaderThread.Create(StdOutRead);
-  try
-    if not CreateProcess(nil, PChar(CmdLine), nil, nil, True,
-      CREATE_NO_WINDOW, nil, nil, StartInfo, ProcInfo) then
-      Exit;
-
-    CloseHandleIfOpen(StdInRead);
-    CloseHandleIfOpen(StdOutWrite);
-
-    if AStdIn <> '' then
-    begin
-      InBytes := TEncoding.UTF8.GetBytes(AStdIn);
-      WriteFile(StdInWrite, InBytes[0], Length(InBytes), BytesWritten, nil);
-    end;
-    CloseHandleIfOpen(StdInWrite);
-
-    Result := WaitCapturedProcess(ProcInfo.hProcess, ATimeoutMs, ACancel);
-    Reader.WaitFor;
-    GetExitCodeProcess(ProcInfo.hProcess, AExitCode);
-    SetLength(OutBytes, Reader.Buf.Size);
-    if Reader.Buf.Size > 0 then
-      Move(Reader.Buf.Memory^, OutBytes[0], Reader.Buf.Size);
-    AOutput := TEncoding.UTF8.GetString(OutBytes);
-    CloseHandle(ProcInfo.hProcess);
-    CloseHandle(ProcInfo.hThread);
-  finally
-    CloseHandleIfOpen(StdInRead);
-    CloseHandleIfOpen(StdInWrite);
-    CloseHandleIfOpen(StdOutWrite);
-    Reader.Free;
-    CloseHandleIfOpen(StdOutRead);
-  end;
-end;
-
 { ---- sftp.exe batch-mode wrapper ------------------------------------------ }
 
 function GetSftpExePath(out AExe: string): Boolean;
 begin
-  Result := FileExistsInPath('sftp.exe');
+  Result := FileExistsInPath(PlatformSftpExeName);
   if Result then
-    AExe := 'sftp.exe'
+    AExe := PlatformSftpExeName
   else
     AExe := '';
 end;
@@ -472,18 +279,18 @@ begin
     ContainsText(Msg, 'did not respond');
 end;
 
-function ErrorFromSpawn(ASpawn: TSftpSpawnResult; const AOutput: string;
+function ErrorFromSpawn(ASpawn: TSpawnResult; const AOutput: string;
   AExitCode: Cardinal; const AURI: string; out AError: TVfsError): Boolean;
 begin
   Result := False;
   case ASpawn of
-    ssrCancelled:
+    srCancelled:
       AError := TVfsError.Make(vecCancelled, 'Cancelled', AURI);
-    ssrSpawnFailed:
-      AError := TVfsError.Make(vecIOError, 'Cannot start sftp.exe', AURI);
-    ssrTimeout:
+    srSpawnFailed:
+      AError := TVfsError.Make(vecIOError, 'Cannot start the sftp client', AURI);
+    srTimeout:
       AError := ClassifySftpFailure(AOutput, AExitCode, True, False, AURI);
-    ssrOk:
+    srOk:
       if AExitCode = 0 then
       begin
         AError := TVfsError.Ok;
@@ -510,7 +317,7 @@ begin
   if not GetSftpExePath(Exe) then
   begin
     AError := TVfsError.Make(vecIOError,
-      'sftp.exe not found in PATH. Install the OpenSSH client.', URI);
+      'sftp not found in PATH. Install the OpenSSH client.', URI);
     Exit(False);
   end;
   SplitAuthority(AAuthority, User, Host, Port);
@@ -530,7 +337,7 @@ begin
       AError := TVfsError.Make(vecCancelled, 'Cancelled', URI);
       Exit(False);
     end;
-    if ErrorFromSpawn(RunCapturedProcess(Exe, Args, ABatchCommands, ATimeoutMs,
+    if ErrorFromSpawn(PlatformRunCaptured(Exe, Args, ABatchCommands, ATimeoutMs,
       ACancel, AOutput, ExitCode), AOutput, ExitCode, URI, AError) then
       Exit(True);
     if (Attempt >= ARetries) or (not SftpFailureIsTransient(AError)) then

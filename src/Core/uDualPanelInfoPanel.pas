@@ -22,7 +22,7 @@ function InfoPercentBar(APercent, AWidth: Integer): string;
 implementation
 
 uses
-  Winapi.Windows, uStrings;
+  uStrings, uPlatformHostInfo;
 
 const
   cFileFg   = TAlphaColor($FFAAAAAA);
@@ -49,18 +49,12 @@ procedure DrawPanelInfoContent(const ABuffer: TTerminalGrid;
   AFrame, ABodyBg: TAlphaColor; const APath: string;
   ABytes: Int64; AFiles, AFolders: Integer);
 var
-  Path, Serial, Comp, User, Domain, Profile, Access, Elevated, DiskTitle: string;
+  Path, Serial, Access, Elevated, DiskTitle: string;
   Info: TDriveInfo;
+  Host: TPlatformHostInfo;
   X, Y, InnerW, MaxY: Integer;
   Fg, ValFg, DiscardBg: TAlphaColor;
-  CompBuf, UserBuf: array[0..255] of Char;
-  CompLen, UserLen: DWORD;
   Used: Int64;
-  Mem: TMemoryStatusEx;
-  Token: THandle;
-  Elev: TOKEN_ELEVATION;
-  ElevSz: DWORD;
-  IsElev: Boolean;
   Tick: UInt64;
   Days, Hours, Mins: Integer;
   BarLeft, BarWidth: Integer;
@@ -179,39 +173,18 @@ begin
   end;
   FillGridRect(ABuffer, X, Y, ABounds.Right - 1, MaxY, ' ', Fg, ABodyBg);
 
-  CompLen := Length(CompBuf);
-  UserLen := Length(UserBuf);
-  FillChar(CompBuf, SizeOf(CompBuf), 0);
-  FillChar(UserBuf, SizeOf(UserBuf), 0);
-  Comp := '';
-  User := '';
-  if GetComputerName(CompBuf, CompLen) then
-    Comp := string(CompBuf);
-  if GetUserName(UserBuf, UserLen) then
-    User := string(UserBuf);
-  Domain := GetEnvironmentVariable('USERDOMAIN');
-  Profile := GetEnvironmentVariable('USERPROFILE');
-
-  IsElev := False;
-  if OpenProcessToken(GetCurrentProcess, TOKEN_QUERY, Token) then
-  try
-    ElevSz := SizeOf(Elev);
-    if GetTokenInformation(Token, TokenElevation, @Elev, SizeOf(Elev), ElevSz) then
-      IsElev := Elev.TokenIsElevated <> 0;
-  finally
-    CloseHandle(Token);
-  end;
-  if IsElev then
+  Host := PlatformHostInfo;
+  if Host.IsElevated then
     Access := T('ui.info.administrator', 'Administrator')
   else
     Access := T('ui.info.user', 'User');
-  if IsElev then
+  if Host.IsElevated then
     Elevated := T('ui.info.yes', 'Yes')
   else
     Elevated := T('ui.info.noLimited', 'No (Limited)');
 
-  PutLR(T('ui.info.computerName', 'Computer name:'), Comp);
-  PutLR(T('ui.info.userName', 'User name:'), User);
+  PutLR(T('ui.info.computerName', 'Computer name:'), Host.ComputerName);
+  PutLR(T('ui.info.userName', 'User name:'), Host.UserName);
   PutLR(T('ui.info.accessLevel', 'Access level:'), Access);
   PutLR(T('ui.info.elevated', 'Elevated:'), Elevated);
   PutBlank;
@@ -261,31 +234,29 @@ begin
   end;
   PutBlank;
 
-  FillChar(Mem, SizeOf(Mem), 0);
-  Mem.dwLength := SizeOf(Mem);
-  if GlobalMemoryStatusEx(Mem) then
+  if Host.HasMemory then
   begin
     PutSection(T('ui.info.memory', 'Memory'));
-    PutLR(T('ui.info.memoryLoad', 'Memory load:'), Format('%d%%', [Mem.dwMemoryLoad]),
-      Integer(Mem.dwMemoryLoad));
-    PutLR(T('ui.info.totalPhysical', 'Total Physical:'), FormatByteCount(Int64(Mem.ullTotalPhys)));
-    PutLR(T('ui.info.availPhysical', 'Avail Physical:'), FormatByteCount(Int64(Mem.ullAvailPhys)));
-    PutLR(T('ui.info.totalPageFile', 'Total PageFile:'), FormatByteCount(Int64(Mem.ullTotalPageFile)));
-    PutLR(T('ui.info.availPageFile', 'Avail PageFile:'), FormatByteCount(Int64(Mem.ullAvailPageFile)));
-    PutLR(T('ui.info.totalVirtual', 'Total Virtual:'), FormatByteCount(Int64(Mem.ullTotalVirtual)));
-    PutLR(T('ui.info.availVirtual', 'Avail Virtual:'), FormatByteCount(Int64(Mem.ullAvailVirtual)));
+    PutLR(T('ui.info.memoryLoad', 'Memory load:'), Format('%d%%', [Host.MemoryLoadPercent]),
+      Host.MemoryLoadPercent);
+    PutLR(T('ui.info.totalPhysical', 'Total Physical:'), FormatByteCount(Host.TotalPhysical));
+    PutLR(T('ui.info.availPhysical', 'Avail Physical:'), FormatByteCount(Host.AvailPhysical));
+    PutLR(T('ui.info.totalPageFile', 'Total PageFile:'), FormatByteCount(Host.TotalPageFile));
+    PutLR(T('ui.info.availPageFile', 'Avail PageFile:'), FormatByteCount(Host.AvailPageFile));
+    PutLR(T('ui.info.totalVirtual', 'Total Virtual:'), FormatByteCount(Host.TotalVirtual));
+    PutLR(T('ui.info.availVirtual', 'Avail Virtual:'), FormatByteCount(Host.AvailVirtual));
   end;
   PutBlank;
 
   PutSection(T('ui.info.hostInfo', 'Host Info'));
-  PutLR(T('ui.info.processId', 'Process ID:'), IntToStr(GetCurrentProcessId));
-  if Profile <> '' then
-    PutLR(T('ui.info.userProfile', 'User profile:'), Profile);
-  if Domain <> '' then
-    PutLR(T('ui.info.userDomain', 'Userdomain:'), Domain);
+  PutLR(T('ui.info.processId', 'Process ID:'), IntToStr(Host.ProcessId));
+  if Host.ProfileDir <> '' then
+    PutLR(T('ui.info.userProfile', 'User profile:'), Host.ProfileDir);
+  if Host.Domain <> '' then
+    PutLR(T('ui.info.userDomain', 'Userdomain:'), Host.Domain);
   PutLR(T('ui.info.os', 'OS:'), Format('[v%d.%d.%d] %s',
     [TOSVersion.Major, TOSVersion.Minor, TOSVersion.Build, TOSVersion.Name]));
-  Tick := GetTickCount64;
+  Tick := Host.UptimeMs;
   Days := Tick div (UInt64(24) * 60 * 60 * 1000);
   Hours := (Tick div (UInt64(60) * 60 * 1000)) mod 24;
   Mins := (Tick div (UInt64(60) * 1000)) mod 60;

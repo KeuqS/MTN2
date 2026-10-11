@@ -1,7 +1,9 @@
 unit uShellAssoc;
 
-{ Platform shell file associations (open handler probe + open).
-  Host/UI code uses only this unit - Windows today, other OS later. }
+{ Platform shell file associations (open handler probe + open), Windows
+  build. Host/UI code uses only this unit. The Posix build lives in
+  Platform\Posix; each project puts exactly one of the two directories on its
+  unit search path. }
 
 interface
 

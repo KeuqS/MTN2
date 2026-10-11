@@ -26,7 +26,7 @@ procedure SkipFinalizationOnExit;
 implementation
 
 uses
-  Winapi.Windows, System.SysUtils, System.IOUtils, uConfigLocation,
+  System.SysUtils, System.IOUtils, uConfigLocation, uPlatformInfo, uPlatformHostInfo,
   DUnitX.TestFramework, DUnitX.Loggers.Console, DUnitX.Loggers.Xml.NUnit;
 
 var
@@ -45,7 +45,7 @@ var
 begin
   // Settings files come from an empty folder of their own, so a run sees the
   // built-in defaults whatever keymap.json or session.json the machine has.
-  ConfigDir := TPath.Combine(TPath.GetTempPath, 'mtn2-tests-' + IntToStr(GetCurrentProcessId));
+  ConfigDir := TPath.Combine(TPath.GetTempPath, 'mtn2-tests-' + IntToStr(PlatformHostInfo.ProcessId));
   SetConfigDirectoryOverride(ConfigDir);
   try
     TDUnitX.CheckCommandLine;
@@ -85,7 +85,7 @@ begin
     Results := nil;
     Runner := nil;
     Flush(Output);
-    ExitProcess(System.ExitCode);
+    PlatformTerminateNow(System.ExitCode);
   end;
 end;
 

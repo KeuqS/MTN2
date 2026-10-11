@@ -30,8 +30,9 @@ type
 implementation
 
 uses
+  uTestPaths,
   System.SysUtils, System.Classes, System.IOUtils, System.Zip, System.DateUtils,
-  uUpdater;
+  uUpdater, uPlatformPaths;
 
 var
   GTemp: string;
@@ -195,7 +196,7 @@ begin
   Stage := TPath.Combine(GTemp, 'stage');
   MakeZip(Zip, ['MTN2.exe', 'plugins/mtn.ws/plugin.json'], ['new exe', 'new plugin']);
   Assert.IsTrue(ExtractUpdate(Zip, Stage, Err), 'extracts a package: ' + Err);
-  Assert.IsTrue(ReadText(TPath.Combine(Stage, 'plugins\mtn.ws\plugin.json')) = 'new plugin',
+  Assert.IsTrue(ReadText(TPath.Combine(Stage, NativePath('plugins/mtn.ws/plugin.json'))) = 'new plugin',
     'nested files keep their folders');
 
   MakeZip(Zip, ['readme.txt'], ['x']);
@@ -215,12 +216,12 @@ begin
   if TDirectory.Exists(AStage) then
     TDirectory.Delete(AStage, True);
   WriteText(TPath.Combine(AApp, 'MTN2.exe'), 'old exe');
-  WriteText(TPath.Combine(AApp, 'plugins\mtn.ws\plugin.json'), 'old plugin');
-  WriteText(TPath.Combine(AApp, 'plugins\mtn.7z\7z.dll'), 'user 7z');
+  WriteText(TPath.Combine(AApp, NativePath('plugins/mtn.ws/plugin.json')), 'old plugin');
+  WriteText(TPath.Combine(AApp, NativePath('plugins/mtn.7z/7z.dll')), 'user 7z');
   WriteText(TPath.Combine(AApp, 'keymap.json'), 'user keymap');
   WriteText(TPath.Combine(AStage, 'MTN2.exe'), 'new exe');
-  WriteText(TPath.Combine(AStage, 'plugins\mtn.ws\plugin.json'), 'new plugin');
-  WriteText(TPath.Combine(AStage, 'help\ru\index.md'), 'new help');
+  WriteText(TPath.Combine(AStage, NativePath('plugins/mtn.ws/plugin.json')), 'new plugin');
+  WriteText(TPath.Combine(AStage, NativePath('help/ru/index.md')), 'new help');
 end;
 
 procedure TestApply;
@@ -233,9 +234,9 @@ begin
   Assert.IsTrue(ApplyStagedUpdate(Stage, App, Err), 'applies: ' + Err);
   Assert.IsTrue(ReadText(TPath.Combine(App, 'MTN2.exe')) = 'new exe', 'exe replaced');
   Assert.IsTrue(ReadText(TPath.Combine(App, 'MTN2.exe.old')) = 'old exe', 'old exe kept as .old');
-  Assert.IsTrue(ReadText(TPath.Combine(App, 'plugins\mtn.ws\plugin.json')) = 'new plugin', 'nested replaced');
-  Assert.IsTrue(ReadText(TPath.Combine(App, 'help\ru\index.md')) = 'new help', 'new file added');
-  Assert.IsTrue(ReadText(TPath.Combine(App, 'plugins\mtn.7z\7z.dll')) = 'user 7z', '7z.dll untouched');
+  Assert.IsTrue(ReadText(TPath.Combine(App, NativePath('plugins/mtn.ws/plugin.json'))) = 'new plugin', 'nested replaced');
+  Assert.IsTrue(ReadText(TPath.Combine(App, NativePath('help/ru/index.md'))) = 'new help', 'new file added');
+  Assert.IsTrue(ReadText(TPath.Combine(App, NativePath('plugins/mtn.7z/7z.dll'))) = 'user 7z', '7z.dll untouched');
   Assert.IsTrue(ReadText(TPath.Combine(App, 'keymap.json')) = 'user keymap', 'user file untouched');
   Assert.IsTrue(not TDirectory.Exists(Stage), 'staging folder removed');
 
@@ -245,7 +246,7 @@ begin
   CleanupOldFiles(App);
   Assert.IsTrue(not TFile.Exists(TPath.Combine(App, 'MTN2.exe.old')), 'X.old removed when X exists');
   Assert.IsTrue(not TFile.Exists(TPath.Combine(App, 'MTN2.exe.old7')), 'X.oldN removed too');
-  Assert.IsTrue(not TFile.Exists(TPath.Combine(App, 'plugins\mtn.ws\plugin.json.old')), 'nested .old removed');
+  Assert.IsTrue(not TFile.Exists(TPath.Combine(App, NativePath('plugins/mtn.ws/plugin.json.old'))), 'nested .old removed');
   Assert.IsTrue(TFile.Exists(TPath.Combine(App, 'notes.old')), 'unrelated *.old user file kept');
 end;
 
@@ -254,11 +255,16 @@ var
   App, Stage, Err: string;
   Lock: TFileStream;
 begin
+  if PlatformPosixPaths then
+  begin
+    Assert.Pass('An open file does not block a rename on this platform');
+    Exit;
+  end;
   App := TPath.Combine(GTemp, 'app2');
   Stage := TPath.Combine(GTemp, 'stage3');
   PrepareApp(App, Stage);
   // An open handle without FILE_SHARE_DELETE blocks renaming this file.
-  Lock := TFileStream.Create(TPath.Combine(App, 'plugins\mtn.ws\plugin.json'),
+  Lock := TFileStream.Create(TPath.Combine(App, NativePath('plugins/mtn.ws/plugin.json')),
     fmOpenRead or fmShareDenyWrite);
   try
     Assert.IsTrue(not ApplyStagedUpdate(Stage, App, Err), 'a locked target fails the update: ' + Err);
@@ -266,9 +272,9 @@ begin
     Lock.Free;
   end;
   Assert.IsTrue(ReadText(TPath.Combine(App, 'MTN2.exe')) = 'old exe', 'exe rolled back');
-  Assert.IsTrue(ReadText(TPath.Combine(App, 'plugins\mtn.ws\plugin.json')) = 'old plugin', 'locked file intact');
+  Assert.IsTrue(ReadText(TPath.Combine(App, NativePath('plugins/mtn.ws/plugin.json'))) = 'old plugin', 'locked file intact');
   Assert.IsTrue(not TFile.Exists(TPath.Combine(App, 'MTN2.exe.old')), 'no .old left after rollback');
-  Assert.IsTrue(not TFile.Exists(TPath.Combine(App, 'help\ru\index.md')), 'added file removed on rollback');
+  Assert.IsTrue(not TFile.Exists(TPath.Combine(App, NativePath('help/ru/index.md'))), 'added file removed on rollback');
 end;
 
 procedure TestSchedule;

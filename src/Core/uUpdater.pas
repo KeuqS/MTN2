@@ -14,7 +14,8 @@ unit uUpdater;
   old one has exited. Only files present in the package are touched -- user
   config, 7z.dll and anything else in the app folder stay as they are.
 
-  CROSS-PLATFORM: Windows-only (MoveFileEx, CreateProcess, version resource). }
+  The OS-specific steps (file version, rename, process start/wait) are in
+  uPlatformUpdate. }
 
 interface
 
@@ -146,7 +147,7 @@ function UpdateCheckDue(const ASettings: TUpdateSettings; ANow: TDateTime): Bool
 implementation
 
 uses
-  Winapi.Windows, System.Math, System.IOUtils, System.JSON, System.Hash, System.Generics.Collections,
+  uPlatformUpdate, System.Math, System.IOUtils, System.JSON, System.Hash, System.Generics.Collections,
   System.Zip, System.DateUtils, System.Net.HttpClient, System.Net.URLClient,
   uSession;
 
@@ -228,24 +229,8 @@ begin
 end;
 
 function FileVersionString(const AExeFile: string): string;
-var
-  Handle, Size, Len: DWORD;
-  Buf: TBytes;
-  Info: PVSFixedFileInfo;
 begin
-  Result := '';
-  Size := GetFileVersionInfoSize(PChar(AExeFile), Handle);
-  if Size = 0 then
-    Exit;
-  SetLength(Buf, Size);
-  if not GetFileVersionInfo(PChar(AExeFile), 0, Size, @Buf[0]) then
-    Exit;
-  if not VerQueryValue(@Buf[0], '\', Pointer(Info), Len) or (Len < SizeOf(TVSFixedFileInfo)) then
-    Exit;
-  Result := Format('%d.%d.%d', [HiWord(Info.dwFileVersionMS), LoWord(Info.dwFileVersionMS),
-    HiWord(Info.dwFileVersionLS)]);
-  if LoWord(Info.dwFileVersionLS) <> 0 then
-    Result := Result + '.' + IntToStr(LoWord(Info.dwFileVersionLS));
+  Result := PlatformFileVersion(AExeFile);
 end;
 
 function AppVersionString: string;
@@ -553,7 +538,7 @@ function ApplyStagedUpdate(const AStagingDir, AAppDir: string; out AError: strin
 var
   Files: TArray<string>;
   Done: TArray<TAppliedFile>;
-  Src, Rel, Root: string;
+  Src, Rel, Root, MoveError: string;
   Item: TAppliedFile;
   I: Integer;
 begin
@@ -572,18 +557,18 @@ begin
       if FileExists(Item.Target) then
       begin
         Item.Backup := FreeBackupName(Item.Target);
-        if (Item.Backup = '') or not MoveFileEx(PChar(Item.Target), PChar(Item.Backup), 0) then
+        if (Item.Backup = '') or
+           not PlatformMoveFile(Item.Target, Item.Backup, False, MoveError) then
         begin
-          AError := Format('%s: %s', [Rel, SysErrorMessage(GetLastError)]);
+          AError := Format('%s: %s', [Rel, MoveError]);
           Exit;
         end;
       end;
-      if not MoveFileEx(PChar(Src), PChar(Item.Target),
-        MOVEFILE_REPLACE_EXISTING or MOVEFILE_COPY_ALLOWED) then
+      if not PlatformMoveFile(Src, Item.Target, True, MoveError) then
       begin
-        AError := Format('%s: %s', [Rel, SysErrorMessage(GetLastError)]);
+        AError := Format('%s: %s', [Rel, MoveError]);
         if Item.Backup <> '' then
-          MoveFileEx(PChar(Item.Backup), PChar(Item.Target), 0);
+          PlatformMoveFile(Item.Backup, Item.Target, False, MoveError);
         Exit;
       end;
       SetLength(Done, Length(Done) + 1);
@@ -597,7 +582,7 @@ begin
       begin
         System.SysUtils.DeleteFile(Done[I].Target);
         if Done[I].Backup <> '' then
-          MoveFileEx(PChar(Done[I].Backup), PChar(Done[I].Target), 0);
+          PlatformMoveFile(Done[I].Backup, Done[I].Target, False, MoveError);
       end
     else
       try
@@ -637,16 +622,8 @@ begin
 end;
 
 function CanWriteToDir(const ADir: string): Boolean;
-var
-  Probe: string;
-  H: THandle;
 begin
-  Probe := TPath.Combine(ADir, '.mtn2-write-probe-' + IntToStr(GetCurrentProcessId));
-  H := CreateFile(PChar(Probe), GENERIC_WRITE, 0, nil, CREATE_ALWAYS,
-    FILE_ATTRIBUTE_TEMPORARY or FILE_FLAG_DELETE_ON_CLOSE, 0);
-  Result := H <> INVALID_HANDLE_VALUE;
-  if Result then
-    CloseHandle(H);
+  Result := PlatformCanWriteToDir(ADir);
 end;
 
 function AppDir: string;
@@ -660,43 +637,21 @@ begin
 end;
 
 function RestartApplication(const AExeFile: string; out AError: string): Boolean;
-var
-  Cmd: string;
-  Si: TStartupInfo;
-  Pi: TProcessInformation;
 begin
-  AError := '';
-  Cmd := Format('"%s" %s %d', [AExeFile, cUpdateWaitPidSwitch, GetCurrentProcessId]);
-  UniqueString(Cmd);
-  ZeroMemory(@Si, SizeOf(Si));
-  Si.cb := SizeOf(Si);
-  Result := CreateProcess(nil, PChar(Cmd), nil, nil, False, 0, nil,
-    PChar(ExtractFileDir(AExeFile)), Si, Pi);
-  if Result then
-  begin
-    CloseHandle(Pi.hThread);
-    CloseHandle(Pi.hProcess);
-  end
-  else
-    AError := SysErrorMessage(GetLastError);
+  Result := PlatformStartProcess(AExeFile,
+    Format('%s %d', [cUpdateWaitPidSwitch, PlatformCurrentProcessId]), AError);
 end;
 
 procedure WaitForPreviousInstanceFromCommandLine;
 var
   I: Integer;
   Pid: Cardinal;
-  H: THandle;
 begin
   for I := 1 to ParamCount - 1 do
     if SameText(ParamStr(I), cUpdateWaitPidSwitch) and
        TryStrToUInt(ParamStr(I + 1), Pid) then
     begin
-      H := OpenProcess(SYNCHRONIZE, False, Pid);
-      if H <> 0 then
-      begin
-        WaitForSingleObject(H, 30000);
-        CloseHandle(H);
-      end;
+      PlatformWaitForProcess(Pid, 30000);
       Exit;
     end;
 end;

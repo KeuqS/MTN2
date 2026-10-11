@@ -20,20 +20,21 @@ type
   [TestFixture]
   TTestPluginLoader = class
   public
-    [Test] procedure TestLoadAndResolveSamplePlugin;
-    [Test] procedure TestArchiveExtensionsFromManifest;
+    [Test] [Category('WindowsOnly')] procedure TestLoadAndResolveSamplePlugin;
+    [Test] [Category('WindowsOnly')] procedure TestArchiveExtensionsFromManifest;
     [Test] procedure TestUnloadIsIdempotent;
-    [Test] procedure TestCatalogLoadsOnDemand;
-    [Test] procedure TestOverridesNeedAllowList;
-    [Test] procedure TestCommandApiFromNativePlugin;
-    [Test] procedure TestDisabledPluginIsNotLoaded;
-    [Test] procedure TestOverridePermissionCanBeChangedAtRuntime;
+    [Test] [Category('WindowsOnly')] procedure TestCatalogLoadsOnDemand;
+    [Test] [Category('WindowsOnly')] procedure TestOverridesNeedAllowList;
+    [Test] [Category('WindowsOnly')] procedure TestCommandApiFromNativePlugin;
+    [Test] [Category('WindowsOnly')] procedure TestDisabledPluginIsNotLoaded;
+    [Test] [Category('WindowsOnly')] procedure TestOverridePermissionCanBeChangedAtRuntime;
     [Test] procedure TestLoadOrderFollowsTheUsersList;
   end;
 
 implementation
 
 uses
+  uTestPaths,
   System.SysUtils, System.Classes, System.TypInfo, System.IOUtils, System.UITypes,
   uVfsTypes,
   uTextEncoding,
@@ -283,7 +284,7 @@ begin
   PluginsRoot := TPath.Combine(ExtractFilePath(ParamStr(0)), 'plugins-test');
   PluginLoader.UnloadAll;
   StageSamplePluginIntoPluginDir(PluginsRoot);
-  TFile.WriteAllText(TPath.Combine(PluginsRoot, 'SamplePlugin\plugin.json'),
+  TFile.WriteAllText(TPath.Combine(PluginsRoot, NativePath('SamplePlugin/plugin.json')),
     '{"id":"SamplePlugin","abi":1,"archiveExtensions":["samplearchive"],' +
     '"schemes":["sample"],"overrides":["sample",".samplearchive"]}', TEncoding.UTF8);
   try
@@ -366,7 +367,7 @@ begin
     Assert.IsTrue(not PluginLoader.SetPluginOverrideAllowed('SamplePlugin', True),
       'a plugin that asks for nothing cannot be granted anything');
 
-    TFile.WriteAllText(TPath.Combine(PluginsRoot, 'SamplePlugin\plugin.json'),
+    TFile.WriteAllText(TPath.Combine(PluginsRoot, NativePath('SamplePlugin/plugin.json')),
       '{"id":"SamplePlugin","abi":1,"schemes":["sample"],"overrides":["sample"]}', TEncoding.UTF8);
     PluginLoader.CatalogPlugins(PluginsRoot);
     Assert.IsTrue(PluginLoader.PluginOverrides('SamplePlugin')[0] = 'sample', 'the manifest list');

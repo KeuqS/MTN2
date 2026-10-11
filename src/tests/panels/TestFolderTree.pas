@@ -27,14 +27,14 @@ type
   [TestFixture]
   TTestFolderTree = class
   public
-    [Test] procedure TestOpenAt;
-    [Test] procedure TestLines;
-    [Test] procedure TestStepInOut;
-    [Test] procedure TestJumpToLetter;
-    [Test] procedure TestControllerBackground;
-    [Test] procedure TestControllerOwner;
-    [Test] procedure TestSyncWithOtherPanel;
-    [Test] procedure TestMouse;
+    [Test] [Category('WindowsOnly')] procedure TestOpenAt;
+    [Test] [Category('WindowsOnly')] procedure TestLines;
+    [Test] [Category('WindowsOnly')] procedure TestStepInOut;
+    [Test] [Category('WindowsOnly')] procedure TestJumpToLetter;
+    [Test] [Category('WindowsOnly')] procedure TestControllerBackground;
+    [Test] [Category('WindowsOnly')] procedure TestControllerOwner;
+    [Test] [Category('WindowsOnly')] procedure TestSyncWithOtherPanel;
+    [Test] [Category('WindowsOnly')] procedure TestMouse;
   end;
 
 implementation

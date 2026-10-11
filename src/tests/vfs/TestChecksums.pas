@@ -108,7 +108,7 @@ begin
   Files := CollectChecksumFiles([TPath.Combine(Base, 'b.txt'), Sub, TPath.Combine(Base, 'A.txt')], Base);
   Assert.IsTrue(Length(Files) = 3, 'file + folder (recursive) + file');
   Assert.IsTrue((Files[0].RelName = 'A.txt') and (Files[1].RelName = 'b.txt') and
-    (Files[2].RelName = 'sub\c.txt'), 'relative names, sorted case-insensitively');
+    (Files[2].RelName = 'sub' + PathDelim + 'c.txt'), 'relative names, sorted case-insensitively');
   Assert.IsTrue(ChecksumSaveFileName(Files, Base, caSHA256) = TPath.Combine(Base, 'checksums.sha256'),
     'several files -> checksums.sha256 in the folder');
   Assert.IsTrue(ChecksumSaveFileName([Files[0]], Base, caMD5) = Files[0].Path + '.md5',

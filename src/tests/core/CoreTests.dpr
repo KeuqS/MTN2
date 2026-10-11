@@ -9,6 +9,7 @@ program CoreTests;
 
 uses
   uTestRunner in '..\common\uTestRunner.pas',
+  TestAnsiFrame in 'TestAnsiFrame.pas',
   TestCharWidth in 'TestCharWidth.pas',
   TestGermanStrings in 'TestGermanStrings.pas',
   TestConfigLocation in 'TestConfigLocation.pas',
@@ -27,6 +28,7 @@ uses
   TestStrings in 'TestStrings.pas',
   TestConsoleLaunch in 'TestConsoleLaunch.pas',
   TestTerminalRenderer in 'TestTerminalRenderer.pas',
+  TestTermInput in 'TestTermInput.pas',
   TestThemeSpec in 'TestThemeSpec.pas',
   TestToast in 'TestToast.pas',
   TestUpdater in 'TestUpdater.pas';

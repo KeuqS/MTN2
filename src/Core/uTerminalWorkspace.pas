@@ -14,8 +14,7 @@ interface
 
 uses
   System.SysUtils, System.Classes, System.UITypes, System.Math, System.Rtti,
-  Winapi.Windows,
-  FMX.Platform,
+  uPlatformInfo,
   uTerminalTypes, uThemeTypes, uTerminalWindow, uConsoleBuffer, uConPty,
   uShellProfiles, uDialogTypes, uDialogHost, uBaseConsoleWindow, uStrings,
   uKeyChord, uKeymap;

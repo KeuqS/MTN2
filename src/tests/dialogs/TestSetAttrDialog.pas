@@ -22,7 +22,7 @@ implementation
 
 uses
   System.SysUtils, System.IOUtils, System.DateUtils,
-  uDialogHost, uDialogTypes, uDualPanelUiTypes, uWinFileAttr,
+  uDialogHost, uDialogTypes, uDualPanelUiTypes, uFileAttrTypes, uWinFileAttr,
   uDualPanelFileDialogs;
 
 var

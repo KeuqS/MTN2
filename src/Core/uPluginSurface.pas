@@ -143,7 +143,7 @@ function SurfaceDeliverKey(AHandle: Integer; AKey: Word; AShift: TShiftState;
 implementation
 
 uses
-  System.Diagnostics, FMX.Types;
+  System.Diagnostics, uCoreTimer;
 
 type
   TSurface = class
@@ -166,7 +166,7 @@ type
     Width, Height: Integer;
     Gen: Cardinal;
     PluginClosing: Boolean;
-    Timer: TTimer;
+    Timer: TCoreTimer;
     LastSeen: Int64;
     procedure Ticked(Sender: TObject);
     destructor Destroy; override;
@@ -420,7 +420,7 @@ begin
   end;
   if S.Timer = nil then
   begin
-    S.Timer := TTimer.Create(nil);
+    S.Timer := TCoreTimer.Create(nil);
     S.Timer.OnTimer := S.Ticked;
   end;
   S.Timer.Interval := AIntervalMs;

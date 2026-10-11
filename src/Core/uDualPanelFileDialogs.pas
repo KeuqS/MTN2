@@ -9,7 +9,7 @@ interface
 uses
   System.SysUtils, System.Classes,
   uDialogHost, uDialogTypes, uDialogJson, uDualPanelUiTypes, uVfsTypes, uLinkUtils,
-  uWinFileAttr, uStrings;
+  uFileAttrTypes, uWinFileAttr, uStrings;
 
 type
   TFileOpKindSetter = reference to procedure(AKind: THostDialogKind);

@@ -24,7 +24,7 @@ implementation
 uses
   System.SysUtils, System.IOUtils, System.DateUtils,
   Winapi.Windows,
-  uWinFileAttr;
+  uFileAttrTypes, uWinFileAttr, uPlatformFileAttr;
 
 function HasBit(const APath: string; ABit: DWORD): Boolean;
 var

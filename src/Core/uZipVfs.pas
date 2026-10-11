@@ -52,7 +52,7 @@ implementation
 
 uses
   System.SysUtils, System.Classes, System.IOUtils, System.Zip, System.DateUtils,
-  System.Generics.Collections, System.Generics.Defaults, Winapi.Windows,
+  System.Generics.Collections, System.Generics.Defaults, uPlatformInfo,
   uZipArchiveCache, uZipNames;
 
 { TZipLayer / TVfsEntryComparer live in uZipArchiveCache (single ownership). }
@@ -2242,9 +2242,8 @@ begin
   TThread.CreateAnonymousThread(
     procedure
     var
-      Path, Drive: string;
+      Path: string;
       Err, DoneErr: TVfsError;
-      FreeAvail, TotalNum: UInt64;
       FreeB, TotalB, DoneFree, DoneTotal: Int64;
     begin
       Err := TVfsError.Ok;
@@ -2261,19 +2260,11 @@ begin
             Err := TVfsError.Make(vecInvalidURI, 'Invalid URI', RootURI)
           else
           begin
-            Drive := ExtractFileDrive(Path);
-            if Drive = '' then
-              Err := TVfsError.Make(vecInvalidURI, 'No drive root', RootURI)
-            else
+            if not PlatformDiskSpace(Path, FreeB, TotalB) then
             begin
-              Drive := IncludeTrailingPathDelimiter(Drive);
-              if GetDiskFreeSpaceEx(PChar(Drive), FreeAvail, TotalNum, nil) then
-              begin
-                FreeB := Int64(FreeAvail);
-                TotalB := Int64(TotalNum);
-              end
-              else
-                Err := TVfsError.Make(vecIOError, 'GetDiskFreeSpaceEx failed', RootURI);
+              FreeB := -1;
+              TotalB := -1;
+              Err := TVfsError.Make(vecIOError, 'Disk space is not available', RootURI);
             end;
           end;
         end;

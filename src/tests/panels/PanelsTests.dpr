@@ -51,6 +51,7 @@ uses
   TestSortMenuController in 'TestSortMenuController.pas',
   TestStubController in 'TestStubController.pas',
   TestTopMenuBar in 'TestTopMenuBar.pas',
+  TestTuiShell in 'TestTuiShell.pas',
   TestUserMenuController in 'TestUserMenuController.pas';
 
 begin

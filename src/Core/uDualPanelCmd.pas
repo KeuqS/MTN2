@@ -70,7 +70,7 @@ function DualPanelCmdLineEditX(const AURI: string; AWidth: Integer): Integer;
 implementation
 
 uses
-  Winapi.Windows, Winapi.ShLwApi, System.Generics.Collections, System.Generics.Defaults;
+  System.Generics.Collections, System.Generics.Defaults, uPlatformInfo;
 
 function UnquoteSingleToken(const AText: string): string;
 var
@@ -381,7 +381,6 @@ end;
 
 function CompactDisplayPath(const APath: string; AMaxLen: Integer): string;
 var
-  Buf: string;
   Head, Tail: Integer;
 begin
   if AMaxLen < 1 then
@@ -390,13 +389,9 @@ begin
     Exit(APath);
   if AMaxLen < 4 then
     Exit(Copy(APath, 1, AMaxLen));
-  SetLength(Buf, AMaxLen);
-  if PathCompactPathEx(PChar(Buf), PChar(APath), Cardinal(AMaxLen) + 1, 0) then
-  begin
-    Result := PChar(Buf);
-    if Result <> '' then
-      Exit;
-  end;
+  Result := PlatformCompactPath(APath, AMaxLen);
+  if Result <> '' then
+    Exit;
   Head := (AMaxLen - 3) div 2;
   Tail := AMaxLen - 3 - Head;
   if Tail < 1 then

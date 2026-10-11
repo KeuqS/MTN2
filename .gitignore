@@ -46,6 +46,9 @@
 !*.rc
 # MTN2Resource.rc -> MTN2.dres: rebuilt by build.ps1 and run-tests.ps1
 *.dres
+# Linux resources (src/tools/make-linux-resources.ps1)
+src/MTN2Tui.rc
+src/MTN2Tui.index.txt
 
 # Project build outputs (see MTN2.dproj: DCC_ExeOutput / DCC_DcuOutput)
 /bin/*

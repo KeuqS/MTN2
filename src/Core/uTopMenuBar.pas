@@ -10,7 +10,7 @@ interface
 
 uses
   System.SysUtils, System.Classes, System.UITypes, System.Math, System.JSON, System.IOUtils,
-  System.Generics.Collections, System.TypInfo, System.Character, Winapi.Windows,
+  System.Generics.Collections, System.TypInfo, System.Character, uResourceAccess,
   uTerminalTypes, uThemeTypes, uThemeDrawing, uDualPanelTypes, uDualPanelOverlays, uStrings,
   uKeymap;
 
@@ -679,17 +679,15 @@ end;
 
 function TTopMenuController.LoadMenuFromResource(const AResName: string): Boolean;
 var
-  RS: TResourceStream;
+  RS: TStream;
   Bytes: TBytes;
   Json: string;
-  UResName: string;
 begin
   Result := False;
-  UResName := UpperCase(Trim(AResName));
-  if FindResource(HInstance, PChar(UResName), RT_RCDATA) = 0 then
+  RS := OpenRcData(UpperCase(Trim(AResName)));
+  if RS = nil then
     Exit;
   try
-    RS := TResourceStream.Create(HInstance, UResName, RT_RCDATA);
     try
       SetLength(Bytes, RS.Size);
       if RS.Size > 0 then

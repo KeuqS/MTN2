@@ -41,7 +41,7 @@ uses
   System.IOUtils,
   System.SyncObjs,
   System.UITypes,
-  Winapi.Windows,
+  uPlatformInfo, uPlatformHostInfo,
   uThemeTypes,
   uTerminalTypes,
   uVfsTypes,
@@ -626,6 +626,7 @@ begin
 
   // Obsidian: vault-root-relative, percent-encoded, with spaces/Cyrillic.
   VaultPic := TPath.Combine(TPath.Combine(DocDir, 'Attachments'), 'Новая картинка 1.png');
+  TDirectory.CreateDirectory(ExtractFileDir(VaultPic));
   TFile.WriteAllText(VaultPic, 'x');
   NestedDoc := TPath.Combine(TPath.Combine(DocDir, 'sub'), 'deep.md');
   TDirectory.CreateDirectory(ExtractFileDir(NestedDoc));
@@ -962,13 +963,13 @@ end;
 
 function WaitDoc(ADoc: TEditorDoc): Boolean;
 var
-  Tick: Cardinal;
+  Tick: UInt64;
 begin
-  Tick := GetTickCount;
+  Tick := PlatformTickCount64;
   while ADoc.Loading do
   begin
     CheckSynchronize(20);
-    if GetTickCount - Tick > 60000 then
+    if PlatformTickCount64 - Tick > 60000 then
       Exit(False);
   end;
   CheckSynchronize(0);
@@ -1031,7 +1032,7 @@ end;
 
 procedure TTestMarkdownParser.SetupFixture;
 begin
-  GTempDir := TPath.Combine(TPath.GetTempPath, 'mtn2_test_md_' + IntToStr(GetCurrentProcessId));
+  GTempDir := TPath.Combine(TPath.GetTempPath, 'mtn2_test_md_' + IntToStr(PlatformHostInfo.ProcessId));
   if TDirectory.Exists(GTempDir) then
     TDirectory.Delete(GTempDir, True);
   TDirectory.CreateDirectory(GTempDir);

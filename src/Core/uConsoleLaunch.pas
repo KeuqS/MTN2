@@ -15,11 +15,12 @@ unit uConsoleLaunch;
 interface
 
 type
-  TLaunchFileKind = (lfkOther, lfkConsoleExe, lfkBatch, lfkPowerShell);
+  TLaunchFileKind = (lfkOther, lfkConsoleExe, lfkBatch, lfkPowerShell, lfkUnixExecutable);
   TConsoleLaunchTarget = (cltShellOpen, cltConsole, cltTerminal);
 
 /// <summary>By extension; a .exe / .com only when its PE header says the
-/// console subsystem. An unreadable file is lfkOther.</summary>
+/// console subsystem; on POSIX a file with an execute permission bit. An
+/// unreadable file is lfkOther.</summary>
 function DetectLaunchFileKind(const APath: string): TLaunchFileKind;
 /// <summary>AConsoleBusy: a command still runs in the background console's
 /// shell.</summary>
@@ -35,7 +36,7 @@ function BuildConsoleLaunchLine(const APath: string; AKind: TLaunchFileKind;
 implementation
 
 uses
-  System.SysUtils, System.Classes, uShellProfiles;
+  System.SysUtils, System.Classes, uShellProfiles, uPlatformFileOps;
 
 const
   cImageSubsystemWindowsCui = 3;
@@ -79,6 +80,8 @@ var
   Ext: string;
 begin
   Result := lfkOther;
+  if PlatformIsExecutableFile(APath) then
+    Exit(lfkUnixExecutable);
   Ext := LowerCase(ExtractFileExt(APath));
   if (Ext = '.bat') or (Ext = '.cmd') then
     Result := lfkBatch
@@ -103,7 +106,10 @@ function ChooseConsoleLaunch(AKind: TLaunchFileKind; const AConsoleProfileId: st
 begin
   if AKind = lfkOther then
     Result := cltShellOpen
-  else if IsWindowsShell(AConsoleProfileId) and not AConsoleBusy then
+  else if (AKind = lfkUnixExecutable) and not AConsoleBusy then
+    Result := cltConsole
+  else if (AKind <> lfkUnixExecutable) and IsWindowsShell(AConsoleProfileId) and
+          not AConsoleBusy then
     Result := cltConsole
   else
     Result := cltTerminal;
@@ -111,7 +117,9 @@ end;
 
 function TerminalProfileForLaunch(AKind: TLaunchFileKind): string;
 begin
-  if AKind = lfkPowerShell then
+  if AKind = lfkUnixExecutable then
+    Result := NormalizeShellProfileId('')
+  else if AKind = lfkPowerShell then
     Result := cShellProfilePowerShell
   else
     Result := cShellProfileCmd;
@@ -123,7 +131,10 @@ var
   Id: string;
 begin
   Id := NormalizeShellProfileId(AProfileId);
-  if (Id = cShellProfilePowerShell) or (Id = cShellProfilePwsh) then
+  if AKind = lfkUnixExecutable then
+    // A single-quoted word keeps every character of the path literal.
+    Result := '''' + StringReplace(APath, '''', '''\''''', [rfReplaceAll]) + ''''
+  else if (Id = cShellProfilePowerShell) or (Id = cShellProfilePwsh) then
     // Call operator on a single-quoted literal: no variable expansion, and
     // a quote in the path doubles.
     Result := '& ''' + StringReplace(APath, '''', '''''', [rfReplaceAll]) + ''''

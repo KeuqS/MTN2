@@ -50,7 +50,7 @@ var
 begin
   Result := TFlatStrings.Create;
   Root := TJSONObject.ParseJSONValue(
-    TFile.ReadAllText(TPath.Combine('..\..\strings', AFileName), TEncoding.UTF8));
+    TFile.ReadAllText(TPath.Combine('../../strings', AFileName), TEncoding.UTF8));
   try
     Assert.IsNotNull(Root, AFileName + ' parses');
     Flatten(Root, '', Result);

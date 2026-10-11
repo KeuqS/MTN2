@@ -86,7 +86,7 @@ implementation
 
 uses
   System.SysUtils, System.Classes, System.IOUtils, System.JSON,
-  System.Generics.Collections, Winapi.Windows;
+  System.Generics.Collections, uResourceAccess;
 
 var
   GLocale: string = 'en';
@@ -147,36 +147,24 @@ end;
 
 function TryLoadLocaleResource(const ALocale: string; out AJson: string): Boolean;
 var
-  ResName: string;
-  Module: HMODULE;
-  RS: TResourceStream;
+  RS: TStream;
   Bytes: TBytes;
 begin
   AJson := '';
-  ResName := 'STRINGS_' + UpperCase(ALocale);
-
-  // Same HInstance-then-MainInstance probe as
-  // uDialogResources.TryLoadDialogResourceJson; the stream is opened on
-  // whichever module has it.
-  Module := HInstance;
-  if FindResource(Module, PChar(ResName), RT_RCDATA) = 0 then
-  begin
-    Module := MainInstance;
-    if FindResource(Module, PChar(ResName), RT_RCDATA) = 0 then
-      Exit(False);
-  end;
+  RS := OpenRcData('STRINGS_' + UpperCase(ALocale));
+  if RS = nil then
+    Exit(False);
   try
-    RS := TResourceStream.Create(Module, ResName, RT_RCDATA);
     try
       SetLength(Bytes, RS.Size);
       if RS.Size > 0 then
         RS.ReadBuffer(Bytes[0], RS.Size);
       AJson := StripBom(TEncoding.UTF8.GetString(Bytes));
-    finally
-      RS.Free;
+    except
+      AJson := '';
     end;
-  except
-    AJson := '';
+  finally
+    RS.Free;
   end;
   Result := Trim(AJson) <> '';
 end;
@@ -276,39 +264,19 @@ begin
   EnsureLoaded;
 end;
 
-function EnumStringsResNameProc(AModule: HMODULE; AType, AName: PChar;
-  AParam: NativeInt): BOOL; stdcall;
-var
-  List: TStringList;
-  NameStr: string;
-begin
-  // Named (string) RT_RCDATA resources only -- an integer resource id
-  // arrives with its low word as the "pointer" per the Win32 convention,
-  // and dialogs\*.json's own DIALOG_* resources are named too, so this
-  // check alone is what keeps this loop from wanting the huge dialog list.
-  if (NativeUInt(AName) shr 16) <> 0 then
-  begin
-    NameStr := UpperCase(AName);
-    if NameStr.StartsWith('STRINGS_') then
-    begin
-      List := TStringList(AParam);
-      NameStr := LowerCase(Copy(NameStr, Length('STRINGS_') + 1, MaxInt));
-      if List.IndexOf(NameStr) < 0 then
-        List.Add(NameStr);
-    end;
-  end;
-  Result := True;
-end;
-
 function AvailableLocales: TArray<string>;
 var
-  List: TStringList;
+  List, Embedded: TStringList;
+  Name: string;
 begin
   List := TStringList.Create;
+  Embedded := TStringList.Create;
   try
     List.CaseSensitive := False;
     List.Add('en');
-    EnumResourceNames(HInstance, RT_RCDATA, @EnumStringsResNameProc, NativeInt(List));
+    ListRcDataNames('STRINGS_', Embedded);
+    for Name in Embedded do
+      List.Add(LowerCase(Copy(Name, Length('STRINGS_') + 1, MaxInt)));
     ForEachStringsDir(
       procedure(ADir: string)
       var
@@ -323,6 +291,7 @@ begin
       end);
     Result := List.ToStringArray;
   finally
+    Embedded.Free;
     List.Free;
   end;
 end;

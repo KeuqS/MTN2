@@ -16,7 +16,7 @@ unit uConsoleWindow;
 interface
 
 uses
-  System.SysUtils, System.Classes, System.UITypes, System.Math, Winapi.Windows,
+  System.SysUtils, System.Classes, System.UITypes, System.Math, uPlatformInfo,
   uTerminalTypes, uThemeTypes, uTerminalWindow, uConsoleBuffer, uConPty, uKeymap,
   uDialogTypes, uDialogHost, uBaseConsoleWindow, uShellProfiles;
 
@@ -90,7 +90,7 @@ type
 implementation
 
 uses
-  FMX.Platform, uStrings, uKeyChord, uChromeRows;
+  uStrings, uKeyChord, uChromeRows;
 
 const
   cTextFg      = TAlphaColor($FFE0E0E0);

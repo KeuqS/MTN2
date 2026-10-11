@@ -15,7 +15,7 @@ type
   public
     [TearDown] procedure TearDown;
     [Test] procedure TestWaitsForTheFirstFrame;
-    [Test] procedure TestFrameGoesToTheOverlay;
+    [Test] [Category('WindowsOnly')] procedure TestFrameGoesToTheOverlay;
     [Test] procedure TestTitleAndStatusLine;
     [Test] procedure TestEscClosesAndOtherKeysGoToThePlugin;
     [Test] procedure TestPluginClosingTheSurfaceClosesTheTab;

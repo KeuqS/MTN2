@@ -40,12 +40,11 @@ interface
 
 uses
   System.SysUtils, System.Classes, System.IOUtils, System.Math, System.Generics.Collections,
-  Winapi.Windows,
   uVfsTypes, uPluginHostAbi, uVfsCdeclAdapter, uVfsRegistry, uPanelPluginRegistry,
   uKeymap, uKeymapRegistry, uMenuRegistry, uCommandRegistry, uDocumentProviders, uPluginUi,
   uPluginChrome, uPluginSettings, uPluginSurface, uPluginServices, uPluginHighlight,
   uPluginManifest, uPluginPermissions, uPluginVfs,
-  uWasmPluginHost;
+  uWasmPluginHost, uPlatformInfo;
 
 type
   TPluginLoadKind = (lpkNative, lpkWasm);
@@ -69,7 +68,7 @@ type
       TLoadedPlugin = record
         PluginId: string;
         Kind: TPluginLoadKind;
-        ModuleHandle: HMODULE;
+        ModuleHandle: NativeUInt;
         WasmInst: TWasmPluginInstance;
         Shutdown: TPluginShutdownProc;
         SetSecret: TPluginSetSecretFn;
@@ -1249,7 +1248,7 @@ begin
   try
     DirFiles := TDirectory.GetFiles(APluginDir, '*', TSearchOption.soTopDirectoryOnly);
     for FileName in DirFiles do
-      if SameText(TPath.GetExtension(FileName), '.dll') then
+      if SameText(TPath.GetExtension(FileName), PlatformSharedLibExt) then
         Dlls.Add(FileName)
       else if SameText(TPath.GetExtension(FileName), '.wat') then
         Wats.Add(FileName)
@@ -1570,7 +1569,7 @@ end;
 
 function TPluginLoader.TryLoadOne(const AFileName, APluginId: string): Boolean;
 var
-  Module: HMODULE;
+  Module: NativeUInt;
   GetAbiVersion: TPluginGetAbiVersionFn;
   InitFn: TPluginInitFn;
   ShutdownFn: TPluginShutdownProc;
@@ -1592,22 +1591,22 @@ begin
     end;
   end;
 
-  Module := LoadLibrary(PChar(AFileName));
+  Module := PlatformLoadLibrary(AFileName);
   if Module = 0 then
   begin
     Log(AFileName, plrLoadLibraryFailed,
-      Format('LoadLibrary failed (GetLastError=%d)', [GetLastError]));
+      Format('LoadLibrary failed (%s)', [PlatformLibraryError]));
     Exit;
   end;
 
-  GetAbiVersion := TPluginGetAbiVersionFn(GetProcAddress(Module, 'mtn_plugin_get_abi_version'));
-  InitFn := TPluginInitFn(GetProcAddress(Module, 'mtn_plugin_init'));
-  ShutdownFn := TPluginShutdownProc(GetProcAddress(Module, 'mtn_plugin_shutdown'));
+  GetAbiVersion := TPluginGetAbiVersionFn(PlatformGetProc(Module, 'mtn_plugin_get_abi_version'));
+  InitFn := TPluginInitFn(PlatformGetProc(Module, 'mtn_plugin_init'));
+  ShutdownFn := TPluginShutdownProc(PlatformGetProc(Module, 'mtn_plugin_shutdown'));
   if not Assigned(GetAbiVersion) or not Assigned(InitFn) or not Assigned(ShutdownFn) then
   begin
     Log(AFileName, plrSkippedHelperDll,
       'No mtn_plugin_* exports (helper DLL)');
-    FreeLibrary(Module);
+    PlatformFreeLibrary(Module);
     Exit;
   end;
 
@@ -1617,7 +1616,7 @@ begin
     on E: Exception do
     begin
       Log(AFileName, plrAbiMismatch, 'mtn_plugin_get_abi_version raised: ' + E.Message);
-      FreeLibrary(Module);
+      PlatformFreeLibrary(Module);
       Exit;
     end;
   end;
@@ -1626,7 +1625,7 @@ begin
   begin
     Log(AFileName, plrAbiMismatch,
       Format('Plugin ABI version %d is outside host range %d..%d', [AbiVersion, cPluginMinAbiVersion, cPluginAbiVersion]));
-    FreeLibrary(Module);
+    PlatformFreeLibrary(Module);
     Exit;
   end;
 
@@ -1641,7 +1640,7 @@ begin
     begin
       Dispose(HostApi);
       Log(AFileName, plrInitFailed, 'mtn_plugin_init raised: ' + E.Message);
-      FreeLibrary(Module);
+      PlatformFreeLibrary(Module);
       Exit;
     end;
   end;
@@ -1650,7 +1649,7 @@ begin
   begin
     Dispose(HostApi);
     Log(AFileName, plrInitFailed, Format('mtn_plugin_init returned %d', [InitResult]));
-    FreeLibrary(Module);
+    PlatformFreeLibrary(Module);
     Exit;
   end;
 
@@ -1659,7 +1658,7 @@ begin
   Loaded.ModuleHandle := Module;
   Loaded.WasmInst := nil;
   Loaded.Shutdown := ShutdownFn;
-  Loaded.SetSecret := TPluginSetSecretFn(GetProcAddress(Module, 'mtn_plugin_set_secret'));
+  Loaded.SetSecret := TPluginSetSecretFn(PlatformGetProc(Module, 'mtn_plugin_set_secret'));
   Loaded.HostApi := HostApi;
   Loaded.KeepLoaded := Manifest.KeepLoaded;
   FLoaded.Add(Loaded);
@@ -1806,7 +1805,7 @@ begin
   FEnsuring := True;
   try
     for FileName in E.Files do
-      if SameText(TPath.GetExtension(FileName), '.dll') then
+      if SameText(TPath.GetExtension(FileName), PlatformSharedLibExt) then
         TryLoadOne(FileName, E.PluginId)
       else
         TryLoadOneWasm(FileName, E.PluginId);
@@ -1959,7 +1958,7 @@ begin
     // dll, then wat, then wasm - same order as before the single scan.
     Modules := CollectPluginModules(PluginDir);
     for FileName in Modules do
-      if SameText(TPath.GetExtension(FileName), '.dll') then
+      if SameText(TPath.GetExtension(FileName), PlatformSharedLibExt) then
         TryLoadOne(FileName, PluginId)
       else
         TryLoadOneWasm(FileName, PluginId);
@@ -2000,7 +1999,7 @@ begin
   if FLoaded[AIndex].HostApi <> nil then
     Dispose(FLoaded[AIndex].HostApi);
   if (FLoaded[AIndex].ModuleHandle <> 0) and not FLoaded[AIndex].KeepLoaded then
-    FreeLibrary(FLoaded[AIndex].ModuleHandle);
+    PlatformFreeLibrary(FLoaded[AIndex].ModuleHandle);
 end;
 
 procedure TPluginLoader.UnloadPlugin(const APluginId: string);

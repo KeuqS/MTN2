@@ -16,7 +16,7 @@ type
     [Test] procedure TestSelectByMaskSkipsFolders;
     [Test] procedure TestSelectFoldersAndStem;
     [Test] procedure TestShiftNavRanges;
-    [Test] procedure TestSelectionKeys;
+    [Test] [Category('WindowsOnly')] procedure TestSelectionKeys;
     [Test] procedure ClearedSelectionCanBeRestored;
   end;
 

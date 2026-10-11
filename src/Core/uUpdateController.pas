@@ -22,7 +22,7 @@ unit uUpdateController;
 interface
 
 uses
-  System.SysUtils, System.Classes, FMX.Types,
+  System.SysUtils, System.Classes, uCoreTimer,
   uDialogTypes, uUpdater;
 
 type
@@ -57,7 +57,7 @@ type
     FWorker: TThread;
     /// <summary>Cancelled by the user to stop the download in flight.</summary>
     FDownloadLife: IUpdateLife;
-    FRetryTimer: TTimer;
+    FRetryTimer: TCoreTimer;
     /// <summary>A dialog that could not open (another one was up) and is
     /// retried by FRetryTimer.</summary>
     FPending: TProc;
@@ -99,8 +99,8 @@ type
 implementation
 
 uses
-  Winapi.Windows, Winapi.ShellAPI, System.IOUtils, System.JSON,
-  uStrings, uNotice;
+  System.IOUtils, System.JSON,
+  uPlatformInfo, uShellAssoc, uStrings, uNotice;
 
 const
   /// <summary>The "checking for updates" toast stays up longer than a
@@ -173,10 +173,21 @@ begin
   FSettings := LoadUpdateSettings;
   FCurrent := AppVersionString;
   FState := usIdle;
-  FRetryTimer := TTimer.Create(nil);
+  FRetryTimer := TCoreTimer.Create(nil);
   FRetryTimer.Enabled := False;
   FRetryTimer.Interval := 5000;
   FRetryTimer.OnTimer := RetryTick;
+end;
+
+// True when the thread has finished within AMs milliseconds.
+function WaitForThread(AThread: TThread; AMs: Cardinal): Boolean;
+var
+  Deadline: UInt64;
+begin
+  Deadline := PlatformTickCount64 + AMs;
+  while not AThread.Finished and (PlatformTickCount64 < Deadline) do
+    Sleep(5);
+  Result := AThread.Finished;
 end;
 
 destructor TUpdateController.Destroy;
@@ -187,7 +198,7 @@ begin
   begin
     // Give a running check/download a moment to notice and finish; a thread
     // still blocked in the network is orphaned rather than blocking exit.
-    if WaitForSingleObject(FWorker.Handle, 3000) = WAIT_OBJECT_0 then
+    if WaitForThread(FWorker, 3000) then
       FWorker.Free
     else
       FWorker.FreeOnTerminate := True;
@@ -202,7 +213,7 @@ begin
   begin
     // One background job at a time. The previous one is normally the quick
     // startup cleanup; a check/download in flight is excluded by FState.
-    if WaitForSingleObject(FWorker.Handle, 2000) <> WAIT_OBJECT_0 then
+    if not WaitForThread(FWorker, 2000) then
       Exit(False);
     FreeAndNil(FWorker);
   end;
@@ -262,7 +273,7 @@ begin
       procedure(ACmd, AValues: string)
       begin
         if SameText(ACmd, cDlgCmdOk) then
-          ShellExecute(0, 'open', PChar(Url), nil, nil, SW_SHOWNORMAL);
+          ShellOpenUrl(Url);
       end);
   end
   else
@@ -483,7 +494,7 @@ begin
       LastTick: UInt64;
     begin
       Zip := DownloadFileName(Rel);
-      LastTick := GetTickCount64;
+      LastTick := PlatformTickCount64;
       Ok := DownloadAsset(Rel, Zip,
         function(ADone, ATotal: Int64): Boolean
         var
@@ -491,9 +502,9 @@ begin
         begin
           Result := not Life.Cancelled and not DownLife.Cancelled;
           // Once a second: the toast shows the progress.
-          if Result and (GetTickCount64 - LastTick >= 1000) then
+          if Result and (PlatformTickCount64 - LastTick >= 1000) then
           begin
-            LastTick := GetTickCount64;
+            LastTick := PlatformTickCount64;
             Text := DownloadProgressText(ADone, ATotal);
             TThread.Queue(nil,
               procedure

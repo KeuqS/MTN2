@@ -14,7 +14,7 @@ type
     [Test] procedure TestWorkspaceLifecycle;
     [Test] procedure TestEmbeddedWorkspace;
     [Test] procedure TestSessionExportFilter;
-    [Test] procedure TestResolvePanelDriveUri;
+    [Test] [Category('WindowsOnly')] procedure TestResolvePanelDriveUri;
     [Test] procedure PanelPlusFollowsTheLastTab;
     [Test] procedure PanelPlusNeedsRoom;
   end;

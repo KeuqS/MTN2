@@ -20,7 +20,7 @@ uses
   uFolderSize, uDualPanelFolderSize, uDualPanelSelection, uDualPanelCmdLine,
   uDualPanelDrawUtils, uDualPanelInfoPanel, uDualPanelPanelDraw, uDualPanelOperations, uTopMenuBar, uMenuRegistry, uCommandRegistry, uDocumentProviders, uPanelPluginRegistry, uPluginHost, uPluginInfo, uPluginServices, uPluginSurface,
   uFolderHistory, uANSIParser,
-  uLinkUtils, uWinFileAttr, uFileCompare, uRecycleBinVfs, uWorkspaceVfs,
+  uLinkUtils, uFileAttrTypes, uWinFileAttr, uFileCompare, uRecycleBinVfs, uWorkspaceVfs,
   uDualPanelSync, uDualPanelTabs, uShellProfiles, uTerminalWorkspace, uOverlayRenderer,
   uColorCodingEditHelpers, uDualPanelColorCoding, uDualPanelKeymapDialog, uDualPanelFolderHotlist,
   uDualPanelWorkspaceLibrary, uWorkspaceLibrary,
@@ -132,7 +132,7 @@ type
     FHistoryPopupCtrl: THistoryPopupController;
     FCmdLineMgr: TDualPanelCmdLineManager;
     /// <summary>Fallback file clipboard when OLE SetClipboard fails; valid
-    /// only while GetClipboardSequenceNumber equals FFileClipSeq.</summary>
+    /// only while PlatformClipboardSequence equals FFileClipSeq.</summary>
     FFileClipUris: TArray<string>;
     FFileClipCut: Boolean;
     FFileClipSeq: Cardinal;
@@ -1195,8 +1195,7 @@ type
 implementation
 
 uses
-  Winapi.Windows, Winapi.ActiveX,
-  uWinFileDragDrop, uStrings, uFileHistory, uPanelCompare, uChromeRows,
+  uPlatformInfo, uPlatformFolders, uPlatformPaths, uImageInfo, uFileClip, uWinFileDragDrop, uStrings, uFileHistory, uPanelCompare, uChromeRows,
   uExternalTools, uDialogHistory, uChecksums, uKeyChord, uConsoleSettings, uZipVfs,
   uCharWidth;
 
@@ -3129,7 +3128,7 @@ begin
   FFileClipUris := Uris;
   FFileClipCut := ACut;
   ClipboardSetPanelItems(Paths, Uris, ACut);
-  FFileClipSeq := GetClipboardSequenceNumber;
+  FFileClipSeq := PlatformClipboardSequence;
   if Length(Uris) > 1 then
   begin
     if ACut then
@@ -3154,7 +3153,7 @@ end;
 function TDualPanelWindow.FileClipStillOurs: Boolean;
 begin
   Result := (Length(FFileClipUris) > 0) and
-    (GetClipboardSequenceNumber = FFileClipSeq);
+    (PlatformClipboardSequence = FFileClipSeq);
 end;
 
 procedure TDualPanelWindow.ClipboardPasteFiles;
@@ -3198,7 +3197,7 @@ begin
     ClipboardClearPanelItems;
     SetLength(FFileClipUris, 0);
     FFileClipCut := False;
-    FFileClipSeq := GetClipboardSequenceNumber;
+    FFileClipSeq := PlatformClipboardSequence;
   end;
 end;
 
@@ -6095,7 +6094,7 @@ begin
     OppURI := ActiveTab(Ws.State.RightPanel).CurrentURI;
   Dir := FileUriToPath(OppURI);
   if Dir = '' then
-    Dir := TPath.GetDocumentsPath;
+    Dir := PlatformDocumentsDir;
   Suggest := TPath.Combine(Dir, 'tmppanel.temp');
   CloseTransientUiBeforeDialog;
   FDialogKind := hdkTmpSaveList;
@@ -6120,7 +6119,7 @@ begin
     Ws := ActiveWorkspace;
     Line := FileUriToPath(ActiveTab(ActivePanel(Ws)).CurrentURI);
     if Line = '' then
-      Line := TPath.GetDocumentsPath;
+      Line := PlatformDocumentsDir;
     Path := TPath.Combine(Line, Path);
   end;
   Lines := TStringList.Create;
@@ -6506,7 +6505,7 @@ begin
   Dir := FileUriToPath(ADirUri);
   if (Dir = '') or (AName = '') then
     Exit;
-  Tick := GetTickCount64;
+  Tick := PlatformTickCount64;
   if (not SameText(Dir, FDescDir)) or (FDescMap = nil) or (Tick - FDescCheckedAt > 1500) then
   begin
     // The timestamp is looked at every second or so, not on every frame.
@@ -7170,11 +7169,17 @@ begin
     NotifyChanged;
     Exit;
   end;
-  // Platform shell open (Windows ShellExecute today; xdg-open / open later).
-  if not ShellOpenFile(APath) then
-    OpenStub(skShellInfo, 'Shell open failed', APath)
-  else
+  // The platform's own opener (ShellExecute, xdg-open).
+  if ShellOpenFile(APath) then
+  begin
     NotifyChanged;
+    Exit;
+  end;
+  // Without a desktop to open it, a file opens in the built-in viewer.
+  if PlatformPosixPaths and LocalPathIsFile(APath) then
+    OpenDocument(PathToFileUri(APath), True)
+  else
+    OpenStub(skShellInfo, 'Shell open failed', APath);
 end;
 
 
@@ -7624,7 +7629,8 @@ end;
 
 function TDualPanelWindow.CanElevateLocal(const AURI: string): Boolean;
 begin
-  Result := Assigned(FElevatedIntf) and not IsProcessElevated and
+  Result := Assigned(FElevatedIntf) and ElevationAvailable and
+    not IsProcessElevated and
     not HasArchiveChain(AURI) and (FileUriToPath(AURI) <> '');
 end;
 
@@ -8057,7 +8063,7 @@ begin
   FDialogKind := hdkConsoleSave;
   FDialog.Open(BuildInputDialog(T('ui.console.saveTitle', 'Save console output'),
     T('ui.console.savePrompt', 'File:'),
-    TPath.Combine(TPath.GetDocumentsPath, 'console-output.txt')), DialogCommand);
+    TPath.Combine(PlatformDocumentsDir, 'console-output.txt')), DialogCommand);
   NotifyChanged;
 end;
 
@@ -8087,7 +8093,7 @@ var
 begin
   Dir := PanelCommandCwd;
   if (Dir = '') or not TDirectory.Exists(Dir) then
-    Dir := TPath.GetDocumentsPath;
+    Dir := PlatformDocumentsDir;
   Result := TPath.Combine(Dir, 'mtn2-settings.zip');
 end;
 
@@ -11919,7 +11925,7 @@ begin
 
   if UpdateListClickPair(HitList, AAllowOpenOnDouble, ADoubleClick,
      ALocalCol, ALocalRow, FLastClickCol, FLastClickRow, FLastClickTick,
-     GetTickCount, GetDoubleClickTime) then
+     Cardinal(PlatformTickCount64), PlatformDoubleClickMs) then
     ActivateCurrent;
 
   Invalidate;
@@ -12127,7 +12133,7 @@ begin
   CancelFileDrag;
   SetDropHighlight(False);
   // Shell consumed files (move to Explorer / another app).
-  if (AEffect and DROPEFFECT_MOVE) <> 0 then
+  if FileDragEffectIsMove(AEffect) then
     ReloadActiveRows;
   NotifyChanged;
 end;

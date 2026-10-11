@@ -19,7 +19,7 @@ type
     [Test] procedure TestRowNameFitsColumn;
     [Test] procedure TestCursorInfoLineFitsWidth;
     [Test] procedure TestWorkspaceTabHitTestUsesCells;
-    [Test] procedure TestPanelTabTitleFitsCells;
+    [Test] [Category('WindowsOnly')] procedure TestPanelTabTitleFitsCells;
   end;
 
 implementation

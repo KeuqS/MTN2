@@ -38,7 +38,7 @@ var
   LSuccess: Boolean;
   LCount: Integer;
 begin
-  LDialogFiles := TDirectory.GetFiles('..\..\dialogs', '*.json');
+  LDialogFiles := TDirectory.GetFiles('../../dialogs', '*.json');
   Assert.IsTrue(Length(LDialogFiles) > 0, 'No dialog JSON files found in ..\..\dialogs');
 
   LCount := 0;
@@ -71,7 +71,7 @@ var
   I: Integer;
 begin
   Assert.IsTrue(TryParseDialogJson(
-    TFile.ReadAllText('..\..\dialogs\colorcodingedit.json', TEncoding.UTF8), LDecl),
+    TFile.ReadAllText('../../dialogs/colorcodingedit.json', TEncoding.UTF8), LDecl),
     'colorcodingedit.json failed to parse');
   I := FindControlById(LDecl, 'cc_normal_sample');
   Assert.IsTrue(I >= 0, 'cc_normal_sample control not found');
@@ -82,7 +82,7 @@ begin
   Writeln('  cc_normal_sample: Kind=dckColorSample, FgSourceId/BgSourceId wired correctly');
 
   Assert.IsTrue(TryParseDialogJson(
-    TFile.ReadAllText('..\..\dialogs\colorpicker.json', TEncoding.UTF8), LDecl),
+    TFile.ReadAllText('../../dialogs/colorpicker.json', TEncoding.UTF8), LDecl),
     'colorpicker.json failed to parse');
   I := FindControlById(LDecl, 'picker');
   Assert.IsTrue(I >= 0, 'picker control not found in colorpicker.json');
@@ -96,7 +96,7 @@ var
   I: Integer;
 begin
   Assert.IsTrue(TryParseDialogJson(
-    TFile.ReadAllText('..\..\dialogs\dirsync.json', TEncoding.UTF8), LDecl),
+    TFile.ReadAllText('../../dialogs/dirsync.json', TEncoding.UTF8), LDecl),
     'dirsync.json failed to parse');
   I := FindControlById(LDecl, 'oneway');
   Assert.IsTrue(I >= 0, 'oneway radio not found');
@@ -128,7 +128,7 @@ var
   I: Integer;
 begin
   Assert.IsTrue(TryParseDialogJson(
-    TFile.ReadAllText('..\..\dialogs\filediff.json', TEncoding.UTF8), LDecl),
+    TFile.ReadAllText('../../dialogs/filediff.json', TEncoding.UTF8), LDecl),
     'filediff.json failed to parse');
   I := FindControlById(LDecl, 'diff');
   Assert.IsTrue(I >= 0, 'diff list not found');
@@ -144,7 +144,7 @@ var
   I: Integer;
 begin
   Assert.IsTrue(TryParseDialogJson(
-    TFile.ReadAllText('..\..\dialogs\archivepassword.json', TEncoding.UTF8), LDecl),
+    TFile.ReadAllText('../../dialogs/archivepassword.json', TEncoding.UTF8), LDecl),
     'archivepassword.json failed to parse');
   I := FindControlById(LDecl, 'password');
   Assert.IsTrue(I >= 0, 'password control not found');
@@ -159,7 +159,7 @@ var
   I: Integer;
 begin
   Assert.IsTrue(TryParseDialogJson(
-    TFile.ReadAllText('..\..\dialogs\selectmask.json', TEncoding.UTF8), LDecl),
+    TFile.ReadAllText('../../dialogs/selectmask.json', TEncoding.UTF8), LDecl),
     'selectmask.json failed to parse');
   I := FindControlById(LDecl, 'name');
   Assert.IsTrue(I >= 0, 'name input not found');
@@ -175,7 +175,7 @@ var
   I: Integer;
 begin
   Assert.IsTrue(TryParseDialogJson(
-    TFile.ReadAllText('..\..\dialogs\setattr.json', TEncoding.UTF8), LDecl),
+    TFile.ReadAllText('../../dialogs/setattr.json', TEncoding.UTF8), LDecl),
     'setattr.json failed to parse');
   I := FindControlById(LDecl, 'attr_ro');
   Assert.IsTrue(I >= 0, 'attr_ro dropdown not found');
@@ -199,7 +199,7 @@ var
   I: Integer;
 begin
   Assert.IsTrue(TryParseDialogJson(
-    TFile.ReadAllText('..\..\dialogs\display.json', TEncoding.UTF8), LDecl),
+    TFile.ReadAllText('../../dialogs/display.json', TEncoding.UTF8), LDecl),
     'display.json failed to parse');
   I := FindControlById(LDecl, 'fonts');
   Assert.IsTrue(I >= 0, 'fonts list not found');
@@ -228,7 +228,7 @@ var
   I: Integer;
 begin
   Assert.IsTrue(TryParseDialogJson(
-    TFile.ReadAllText('..\..\dialogs\jobprogress.json', TEncoding.UTF8), LDecl),
+    TFile.ReadAllText('../../dialogs/jobprogress.json', TEncoding.UTF8), LDecl),
     'jobprogress.json failed to parse');
   Assert.IsTrue(LDecl.Width >= 72, 'jobprogress is as wide as the old overlay');
   I := FindControlById(LDecl, 'verb');
@@ -254,7 +254,7 @@ begin
   Writeln('  jobprogress.json: verb/src/dst/bars + Background/Cancel');
 
   Assert.IsTrue(TryParseDialogJson(
-    TFile.ReadAllText('..\..\dialogs\jobprogressdelete.json', TEncoding.UTF8), LDecl),
+    TFile.ReadAllText('../../dialogs/jobprogressdelete.json', TEncoding.UTF8), LDecl),
     'jobprogressdelete.json failed to parse');
   I := FindControlById(LDecl, 'src');
   Assert.IsTrue(I >= 0, 'delete src');
@@ -265,7 +265,7 @@ begin
   Writeln('  jobprogressdelete.json: path + bar + Background/Cancel');
 
   Assert.IsTrue(TryParseDialogJson(
-    TFile.ReadAllText('..\..\dialogs\jobprogresserror.json', TEncoding.UTF8), LDecl),
+    TFile.ReadAllText('../../dialogs/jobprogresserror.json', TEncoding.UTF8), LDecl),
     'jobprogresserror.json failed to parse');
   I := FindControlById(LDecl, 'message');
   Assert.IsTrue(I >= 0, 'error message');
@@ -280,7 +280,7 @@ var
   I: Integer;
 begin
   Assert.IsTrue(TryParseDialogJson(
-    TFile.ReadAllText('..\..\dialogs\deleteerror.json', TEncoding.UTF8), LDecl),
+    TFile.ReadAllText('../../dialogs/deleteerror.json', TEncoding.UTF8), LDecl),
     'deleteerror.json failed to parse');
   Assert.IsTrue(LDecl.Height >= 13, 'deleteerror dialog is tall enough for a wrapped OS message');
   I := FindControlById(LDecl, 'error_line');

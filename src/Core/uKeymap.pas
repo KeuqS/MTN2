@@ -7,7 +7,7 @@ interface
 
 uses
   System.SysUtils, System.Classes, System.UITypes, System.JSON, System.IOUtils,
-  System.Generics.Collections, Winapi.Windows;
+  System.Generics.Collections, uResourceAccess;
 
 type
   TKeymapAction = (
@@ -1239,15 +1239,15 @@ const
 /// MTN2.rc/MTN2Resource.rc). Mirrors uDialogResources.TryLoadDialogResourceJson.</summary>
 function TryLoadKeymapResourceJson(out AJson: string): Boolean;
 var
-  RS: TResourceStream;
+  RS: TStream;
   Bytes: TBytes;
 begin
   AJson := '';
   Result := False;
-  if FindResource(HInstance, cResKeymapDefault, RT_RCDATA) = 0 then
+  RS := OpenRcData(cResKeymapDefault);
+  if RS = nil then
     Exit;
   try
-    RS := TResourceStream.Create(HInstance, cResKeymapDefault, RT_RCDATA);
     try
       SetLength(Bytes, RS.Size);
       if RS.Size > 0 then

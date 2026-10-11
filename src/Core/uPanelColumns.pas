@@ -136,16 +136,24 @@ implementation
 
 uses
   System.Generics.Collections, System.Generics.Defaults, uVfsUtils, uStrings,
-  uCharWidth;
+  uCharWidth, uPlatformPaths;
 
 const
   cSizeW = 8;
   cDateW = 14;
-  cAttrW = 5;
   cExtW  = 5;
   cTypeW = 8;
   cIconW = 2;
   cBriefMinColW = 28;
+
+// R/H/S/A/L flags on Windows, the permission string (rwxr-xr-x) elsewhere.
+function AttrColumnWidth: Integer;
+begin
+  if PlatformPosixPaths then
+    Result := 9
+  else
+    Result := 5;
+end;
 
 function PanelIconColumnWidth: Integer;
 begin
@@ -404,7 +412,7 @@ begin
   if AConfig.ShowCreated then Add(PanelColumnTitle(pscCreated), cDateW, pscCreated);
   if AConfig.ShowAccessed then Add(PanelColumnTitle(pscAccessed), cDateW, pscAccessed);
   if AConfig.ShowType then Add(PanelColumnTitle(pscType), cTypeW, pscType);
-  if AConfig.ShowAttr then Add(PanelColumnTitle(pscAttr), cAttrW, pscAttr);
+  if AConfig.ShowAttr then Add(PanelColumnTitle(pscAttr), AttrColumnWidth, pscAttr);
 end;
 
 procedure PanelColumnWidths(AMode: TPanelColumnMode; AListWidth: Integer;
@@ -421,9 +429,9 @@ begin
     pcmDate:
       AMetaW := cSizeW + 1 + cDateW;
     pcmFull, pcmCreated:
-      AMetaW := cSizeW + 1 + cDateW + 1 + cAttrW;
+      AMetaW := cSizeW + 1 + cDateW + 1 + AttrColumnWidth;
     pcmTypes:
-      AMetaW := cExtW + 1 + cSizeW + 1 + cTypeW + 1 + cAttrW;
+      AMetaW := cExtW + 1 + cSizeW + 1 + cTypeW + 1 + AttrColumnWidth;
     pcmCustom:
       begin
         Defs := BuildCustomColumnDefs(GCustomColumnsConfig);
@@ -436,7 +444,7 @@ begin
         end;
       end;
   else
-    AMetaW := cSizeW + 1 + cDateW + 1 + cAttrW;
+    AMetaW := cSizeW + 1 + cDateW + 1 + AttrColumnWidth;
   end;
   IconRes := PanelIconReserve;
   if AMetaW > 0 then
@@ -576,7 +584,7 @@ begin
   end;
   if ShowAttr then
   begin
-    ColW := cAttrW;
+    ColW := AttrColumnWidth;
     if (ARelCol >= X) and (ARelCol < X + ColW) then
     begin
       ACol := pscAttr;
@@ -749,8 +757,8 @@ begin
   SizePart := PadLeft(ARow.SizeText, cSizeW);
   AttrPart := ARow.AttrText;
   if AttrPart = '' then
-    AttrPart := '-----';
-  AttrPart := PadRight(Copy(AttrPart, 1, cAttrW), cAttrW);
+    AttrPart := StringOfChar('-', AttrColumnWidth);
+  AttrPart := PadRight(Copy(AttrPart, 1, AttrColumnWidth), AttrColumnWidth);
 
   ExtPart := ARow.Extension;
   if (ExtPart <> '') and (ExtPart[1] = '.') then

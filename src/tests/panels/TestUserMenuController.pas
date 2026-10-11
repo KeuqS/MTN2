@@ -22,7 +22,7 @@ type
     [Test] procedure TestEditRequestsAndMove;
     [Test] procedure TestClicks;
     [Test] procedure TestJsonRoundTrip;
-    [Test] procedure TestMacros;
+    [Test] [Category('WindowsOnly')] procedure TestMacros;
     [Test] procedure TestFolderMenus;
   end;
 

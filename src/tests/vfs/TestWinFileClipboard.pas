@@ -17,6 +17,7 @@ implementation
 uses
   System.SysUtils,
   uVfsTypes,
+  uFileClip,
   uWinFileDragDrop;
 
 procedure TestEncodeDecode;

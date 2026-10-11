@@ -418,8 +418,8 @@ type
 implementation
 
 uses
-  System.IOUtils, System.StrUtils, FMX.Platform,
-  System.JSON, uOverlayRenderer, uPluginSurface, uPluginServices, uPluginHighlight, uStrings, uDialogHistory, uDialogResources, uNotice,
+  System.IOUtils, System.StrUtils, uClipboardService,
+  System.JSON, uOverlayRenderer, uImageInfo, uPluginSurface, uPluginServices, uPluginHighlight, uStrings, uDialogHistory, uDialogResources, uNotice,
   uShellAssoc, uKeyChord, uChromeRows;
 
 const
@@ -3238,24 +3238,13 @@ begin
 end;
 
 function TEditorWindow.ClipboardGetText: string;
-var
-  Svc: IFMXClipboardService;
-  V: TValue;
 begin
-  Result := '';
-  if not TPlatformServices.Current.SupportsPlatformService(IFMXClipboardService, Svc) then
-    Exit;
-  V := Svc.GetClipboard;
-  if not V.IsEmpty and V.IsType<string> then
-    Result := V.AsString;
+  Result := uClipboardService.GetClipboardText;
 end;
 
 procedure TEditorWindow.ClipboardSetText(const AText: string);
-var
-  Svc: IFMXClipboardService;
 begin
-  if TPlatformServices.Current.SupportsPlatformService(IFMXClipboardService, Svc) then
-    Svc.SetClipboard(AText);
+  uClipboardService.SetClipboardText(AText);
 end;
 
 procedure TEditorWindow.CopySelectionOrLine;

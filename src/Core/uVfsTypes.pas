@@ -25,6 +25,9 @@ type
     IsOffline: Boolean;
     /// <summary>Symlink / junction / other reparse point.</summary>
     IsLink: Boolean;
+    /// <summary>POSIX permission bits (rwx for owner, group, others, with the
+    /// setuid, setgid and sticky bits); 0 when the provider has none.</summary>
+    UnixMode: Cardinal;
     CreationTime: TDateTime;
     ModificationTime: TDateTime;
     AccessTime: TDateTime;
@@ -235,7 +238,7 @@ function FormatVfsAttrText(const AEntry: TVfsEntry): string; overload;
 implementation
 
 uses
-  Winapi.Windows, System.StrUtils, System.Math, uCharWidth;
+  System.StrUtils, System.Math, uCharWidth, uPlatformPaths;
 
 class function TVfsError.Ok: TVfsError;
 begin
@@ -275,6 +278,32 @@ begin
     (P[2] = ':');
 end;
 
+// The root of the local file system: a drive root on Windows, "/" elsewhere.
+function IsLocalRoot(const APath: string): Boolean;
+begin
+  if PlatformPosixPaths then
+    Result := APath = '/'
+  else
+    Result := IsWindowsDriveRoot(APath);
+end;
+
+// Local paths compare case-insensitively on Windows, exactly elsewhere.
+function SameLocalPath(const A, B: string): Boolean;
+begin
+  if PlatformPosixPaths then
+    Result := A = B
+  else
+    Result := SameText(A, B);
+end;
+
+function LocalPathKey(const APath: string): string;
+begin
+  if PlatformPosixPaths then
+    Result := APath
+  else
+    Result := LowerCase(APath);
+end;
+
 function DriveRootPath(const ADriveLetter: Char): string;
 begin
   Result := UpCase(ADriveLetter) + ':' + PathDelim;
@@ -287,6 +316,13 @@ begin
   P := Trim(APath);
   if P = '' then
     Exit('');
+  if PlatformPosixPaths then
+  begin
+    Result := TPath.GetFullPath(P);
+    if Length(Result) > 1 then
+      Result := ExcludeTrailingPathDelimiter(Result);
+    Exit;
+  end;
   // Bare "C:" means current-dir-on-drive in Windows APIs - force true root.
   if (Length(P) = 2) and (P[2] = ':') and (UpCase(P[1]) >= 'A') and (UpCase(P[1]) <= 'Z') then
     Exit(DriveRootPath(P[1]));
@@ -411,7 +447,8 @@ end;
 
 function WinApiPath(const APath: string): string;
 const
-  cLongPathThreshold = MAX_PATH - 12;
+  cMaxPath = 260;
+  cLongPathThreshold = cMaxPath - 12;
 begin
   Result := APath;
   if (Length(Result) < cLongPathThreshold) or Result.StartsWith('\\?\') or
@@ -430,28 +467,22 @@ end;
 
 function LocalPathIsDirectory(const APath: string): Boolean;
 var
-  Attr: DWORD;
   P: string;
 begin
   P := NormalizeLocalPath(APath);
   if P = '' then
     Exit(False);
-  Attr := GetFileAttributes(PChar(WinApiPath(P)));
-  Result := (Attr <> INVALID_FILE_ATTRIBUTES) and
-    ((Attr and FILE_ATTRIBUTE_DIRECTORY) <> 0);
+  Result := PlatformIsDirectory(WinApiPath(P));
 end;
 
 function LocalPathIsFile(const APath: string): Boolean;
 var
-  Attr: DWORD;
   P: string;
 begin
   P := NormalizeLocalPath(APath);
   if P = '' then
     Exit(False);
-  Attr := GetFileAttributes(PChar(WinApiPath(P)));
-  Result := (Attr <> INVALID_FILE_ATTRIBUTES) and
-    ((Attr and FILE_ATTRIBUTE_DIRECTORY) = 0);
+  Result := PlatformIsFile(WinApiPath(P));
 end;
 
 function DriveLetterOf(const APath: string): Char;
@@ -469,9 +500,6 @@ end;
 function ResolveLocalDirPath(const APath: string): string;
 var
   P: string;
-  H: THandle;
-  Buf: array[0..4095] of Char;
-  N: DWORD;
   FinalPath: string;
   OrigDrive, FinalDrive: Char;
 begin
@@ -495,37 +523,24 @@ begin
   if not LocalPathIsDirectory(P) then
     Exit;
   // Follow junction/symlink (Documents and Settings -> C:\Users).
-  // FILE_FLAG_BACKUP_SEMANTICS without OPEN_REPARSE_POINT follows the target.
-  H := CreateFile(PChar(WinApiPath(P)), 0,
-    FILE_SHARE_READ or FILE_SHARE_WRITE or FILE_SHARE_DELETE,
-    nil, OPEN_EXISTING, FILE_FLAG_BACKUP_SEMANTICS, 0);
-  if H = INVALID_HANDLE_VALUE then
+  FinalPath := PlatformFinalDirPath(WinApiPath(P));
+  if FinalPath = '' then
     Exit;
-  try
-    FillChar(Buf[0], SizeOf(Buf), 0);
-    {$WARN SYMBOL_PLATFORM OFF}
-    N := GetFinalPathNameByHandle(H, Buf, Length(Buf), FILE_NAME_NORMALIZED);
-    {$WARN SYMBOL_PLATFORM ON}
-    if N = 0 then
+  FinalPath := StripExtendedPathPrefix(FinalPath);
+  FinalPath := NormalizeLocalPath(FinalPath);
+  if (FinalPath = '') or not LocalPathIsDirectory(FinalPath) then
+    Exit;
+  // SUBST / mapped drives: GetFinalPathName jumps to another letter or UNC
+  // (P:\Folder -> D:\Real\Folder). Keeping that URI makes the panel leave the
+  // drive root, so ".." appears after going up - stay on the original drive.
+  OrigDrive := DriveLetterOf(P);
+  if OrigDrive <> #0 then
+  begin
+    FinalDrive := DriveLetterOf(FinalPath);
+    if (FinalDrive = #0) or (FinalDrive <> OrigDrive) then
       Exit;
-    FinalPath := StripExtendedPathPrefix(Copy(string(Buf), 1, N));
-    FinalPath := NormalizeLocalPath(FinalPath);
-    if (FinalPath = '') or not LocalPathIsDirectory(FinalPath) then
-      Exit;
-    // SUBST / mapped drives: GetFinalPathName jumps to another letter or UNC
-    // (P:\Folder -> D:\Real\Folder). Keeping that URI makes the panel leave the
-    // drive root, so ".." appears after going up - stay on the original drive.
-    OrigDrive := DriveLetterOf(P);
-    if OrigDrive <> #0 then
-    begin
-      FinalDrive := DriveLetterOf(FinalPath);
-      if (FinalDrive = #0) or (FinalDrive <> OrigDrive) then
-        Exit;
-    end;
-    Result := FinalPath;
-  finally
-    CloseHandle(H);
   end;
+  Result := FinalPath;
 end;
 
 function ResolveFileUri(const AURI: string): string;
@@ -546,6 +561,31 @@ begin
     if Pos('://', S) > 0 then
       Exit('');
     Exit(NormalizeLocalPath(S));
+  end;
+
+  if PlatformPosixPaths then
+  begin
+    // file:///path, file://localhost/path, file:/path
+    if S.StartsWith('file://', True) then
+      PathPart := Copy(S, Length('file://') + 1, MaxInt)
+    else
+      PathPart := Copy(S, Length('file:') + 1, MaxInt);
+    if (PathPart <> '') and (PathPart[1] <> '/') then
+    begin
+      P := Pos('/', PathPart);
+      if P = 0 then
+        Exit('');
+      Host := DecodeFileUriPath(Copy(PathPart, 1, P - 1));
+      if not SameText(Host, 'localhost') then
+        Exit('');
+      PathPart := Copy(PathPart, P, MaxInt);
+    end;
+    while PathPart.StartsWith('//') do
+      Delete(PathPart, 1, 1);
+    PathPart := DecodeFileUriPath(PathPart);
+    if PathPart = '' then
+      Exit('');
+    Exit(NormalizeLocalPath(PathPart));
   end;
 
   // Legacy / mistaken form: file:////server/share
@@ -604,6 +644,9 @@ begin
   Full := NormalizeLocalPath(APath);
   if Full = '' then
     Full := APath;
+  if PlatformPosixPaths then
+    // file:///home/user; the root is file:///
+    Exit('file://' + EncodeFileUriPath(Full));
   if IsWindowsDriveRoot(Full) then
     // Canonical drive root URI: file:///C:/
     Result := 'file:///' + UpCase(Full[1]) + ':/'
@@ -780,12 +823,12 @@ begin
   if IsSystemFoldersUri(A) or IsSystemFoldersUri(B) then
     Exit(IsSystemFoldersUri(A) and IsSystemFoldersUri(B));
   if not HasArchiveChain(A) and not HasArchiveChain(B) then
-    Exit(SameText(FileUriToPath(A), FileUriToPath(B)));
+    Exit(SameLocalPath(FileUriToPath(A), FileUriToPath(B)));
   if not SplitArchiveUri(A, BaseA, SegA) then
     Exit(False);
   if not SplitArchiveUri(B, BaseB, SegB) then
     Exit(False);
-  if not SameText(ArchiveBaseLocalPath(BaseA), ArchiveBaseLocalPath(BaseB)) then
+  if not SameLocalPath(ArchiveBaseLocalPath(BaseA), ArchiveBaseLocalPath(BaseB)) then
     Exit(False);
   if Length(SegA) <> Length(SegB) then
     Exit(False);
@@ -823,10 +866,10 @@ begin
   if IsSystemFoldersUri(AURI) then
     Exit('sys'#0);
   if not HasArchiveChain(AURI) then
-    Exit('file'#0 + LowerCase(FileUriToPath(AURI)));
+    Exit('file'#0 + LocalPathKey(FileUriToPath(AURI)));
   if not SplitArchiveUri(AURI, Base, Segs) then
     Exit(#1 + AURI);
-  Result := 'arc'#0 + LowerCase(ArchiveBaseLocalPath(Base)) + #0 +
+  Result := 'arc'#0 + LocalPathKey(ArchiveBaseLocalPath(Base)) + #0 +
     IntToStr(Length(Segs));
   for I := 0 to High(Segs) do
     Result := Result + #0 + LowerCase(Segs[I]);
@@ -889,6 +932,8 @@ var
   S: string;
 begin
   S := Trim(ABaseUri);
+  if PlatformPosixPaths and S.StartsWith('7z://', True) then
+    Exit(NormalizeLocalPath(Copy(S, Length('7z://') + 1, MaxInt)));
   if S.StartsWith('7z:///', True) then
   begin
     S := Copy(S, Length('7z:///') + 1, MaxInt);
@@ -930,6 +975,9 @@ begin
   P := ExcludeTrailingPathDelimiter(Trim(AArchivePath));
   if (P = '') or (Trim(AScheme) = '') then
     Exit('');
+  if PlatformPosixPaths then
+    // 7z:///home/user/a.7z!/ - the path keeps its leading slash.
+    Exit(LowerCase(Trim(AScheme)) + '://' + P + '!/');
   P := StringReplace(P, '\', '/', [rfReplaceAll]);
   Result := LowerCase(Trim(AScheme)) + ':///' + P + '!/';
 end;
@@ -978,8 +1026,31 @@ begin
     Result := Result + '-';
 end;
 
+function FormatUnixMode(AMode: Cardinal): string;
+const
+  cTriads = 'rwxrwxrwx';
+var
+  I: Integer;
+begin
+  Result := '';
+  for I := 0 to 8 do
+    if (AMode and (Cardinal(1) shl (8 - I))) <> 0 then
+      Result := Result + cTriads[I + 1]
+    else
+      Result := Result + '-';
+  // setuid / setgid / sticky replace the execute position.
+  if (AMode and $800) <> 0 then
+    Result[3] := IfThen((AMode and $40) <> 0, 's', 'S')[1];
+  if (AMode and $400) <> 0 then
+    Result[6] := IfThen((AMode and $8) <> 0, 's', 'S')[1];
+  if (AMode and $200) <> 0 then
+    Result[9] := IfThen((AMode and $1) <> 0, 't', 'T')[1];
+end;
+
 function FormatVfsAttrText(const AEntry: TVfsEntry): string;
 begin
+  if AEntry.UnixMode <> 0 then
+    Exit(FormatUnixMode(AEntry.UnixMode));
   Result := FormatVfsAttrText(AEntry.IsReadOnly, AEntry.IsHidden, AEntry.IsSystem,
     AEntry.IsArchive, AEntry.IsLink);
 end;
@@ -1195,8 +1266,11 @@ begin
   Name := AName;
   if Name = '' then
     Exit(ADirURI);
-  Name := StringReplace(Name, '\', '/', [rfReplaceAll]);
-  while (Length(Name) > 0) and ((Name[1] = '/') or (Name[1] = '\')) do
+  // A backslash separates only on Windows; elsewhere it is part of a name.
+  if not PlatformPosixPaths then
+    Name := StringReplace(Name, '\', '/', [rfReplaceAll]);
+  while (Length(Name) > 0) and ((Name[1] = '/') or
+    (not PlatformPosixPaths and (Name[1] = '\'))) do
     Delete(Name, 1, 1);
 
   if IsFindUri(ADirURI) then
@@ -1301,10 +1375,10 @@ var
   Path, Parent: string;
 begin
   Path := FileUriToPath(AURI);
-  if IsWindowsDriveRoot(Path) then
+  if IsLocalRoot(Path) then
     Exit(PathToFileUri(Path));
   Parent := TPath.GetDirectoryName(ExcludeTrailingPathDelimiter(Path));
-  if (Parent = '') or SameText(NormalizeLocalPath(Parent), NormalizeLocalPath(Path)) then
+  if (Parent = '') or SameLocalPath(NormalizeLocalPath(Parent), NormalizeLocalPath(Path)) then
     Result := PathToFileUri(Path)
   else
     Result := PathToFileUri(Parent);
@@ -1440,6 +1514,8 @@ begin
   if not HasArchiveChain(AURI) then
   begin
     Path := FileUriToPath(AURI);
+    if PlatformPosixPaths and (Path = '/') then
+      Exit('/');
     if IsWindowsDriveRoot(Path) then
       Exit(UpCase(Path[1]) + ':');
     Path := ExcludeTrailingPathDelimiter(Path);
@@ -1482,6 +1558,19 @@ begin
      IsTmpPanelUri(AURI) or IsWorkspaceUri(AURI) or HasArchiveChain(AURI) then
     Exit(VfsUriTitle(AURI));
   Path := FileUriToPath(AURI);
+  if PlatformPosixPaths then
+  begin
+    // The path itself, shortened from the middle to its last folder.
+    if (Path = '/') or (AMaxLen < 1) then
+      Exit(Copy(Path, 1, Max(AMaxLen, 0)));
+    Path := ExcludeTrailingPathDelimiter(Path);
+    if Length(Path) <= AMaxLen then
+      Exit(Path);
+    Tail := TPath.GetFileName(Path);
+    if Length(Tail) + 5 <= AMaxLen then
+      Exit('/.../' + Tail);
+    Exit(Copy(Tail, Max(Length(Tail) - AMaxLen + 1, 1), AMaxLen));
+  end;
   if IsWindowsDriveRoot(Path) then
     Exit(UpCase(Path[1]) + ':');
   Path := ExcludeTrailingPathDelimiter(Path);
@@ -1590,7 +1679,7 @@ begin
   if HasArchiveChain(AURI) or IsFindUri(AURI) or IsSystemFoldersUri(AURI) or
      IsRecycleBinUri(AURI) or IsTmpPanelUri(AURI) then
     Exit(False);
-  Result := IsWindowsDriveRoot(FileUriToPath(AURI));
+  Result := IsLocalRoot(FileUriToPath(AURI));
 end;
 
 end.

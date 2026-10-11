@@ -1,13 +1,9 @@
 unit uSysFoldersVfs;
 
 { Virtual file system backend for sys://folders.
-  Lists Windows system directories (Desktop, Documents, Downloads, AppData, etc.).
-  Each entry has TargetURI set to its real file:// path.
-
-  CROSS-PLATFORM: the folder set/lookup (SHGetKnownFolderPath-class
-  APIs) is Windows-only; POSIX equivalents are XDG user dirs (Linux) /
-  NSSearchPathForDirectoriesInDomains (macOS) -- different sources, same
-  sys://folders scheme and TargetURI contract for callers. }
+  Lists the well-known system directories (Desktop, Documents, Downloads,
+  AppData, etc.). Each entry has TargetURI set to its real file:// path. The
+  folder set comes from uPlatformFolders. }
 
 interface
 
@@ -45,7 +41,7 @@ type
 implementation
 
 uses
-  System.SysUtils, System.Classes, System.IOUtils, Winapi.Windows, Winapi.ShLObj;
+  System.SysUtils, System.Classes, System.IOUtils, uPlatformFolders;
 
 procedure QueueList(const AOnDone: TVfsListCallback; const AItems: TArray<TVfsEntry>;
   const AError: TVfsError);
@@ -144,30 +140,17 @@ begin
     end);
 end;
 
-function GetSpecialFolderPath(ACSIDL: Integer): string;
+procedure AddSysFolder(var AList: TArray<TVfsEntry>; const AFolder: TPlatformFolder);
 var
-  Path: array[0..MAX_PATH] of Char;
-begin
-  Result := '';
-  if SHGetFolderPath(0, ACSIDL, 0, SHGFP_TYPE_CURRENT, Path) = S_OK then
-    Result := string(Path);
-end;
-
-procedure AddSysFolder(var AList: TArray<TVfsEntry>; const AName: string; ACSIDL: Integer);
-var
-  RealPath: string;
   E: TVfsEntry;
   N: Integer;
 begin
-  RealPath := GetSpecialFolderPath(ACSIDL);
-  if (RealPath = '') or not TDirectory.Exists(RealPath) then
-    Exit;
   FillChar(E, SizeOf(E), 0);
-  E.Name := AName;
+  E.Name := AFolder.Name;
   E.IsDirectory := True;
-  E.TargetURI := PathToFileUri(RealPath);
+  E.TargetURI := PathToFileUri(AFolder.Path);
   try
-    E.ModificationTime := TDirectory.GetLastWriteTime(RealPath);
+    E.ModificationTime := TDirectory.GetLastWriteTime(AFolder.Path);
   except
   end;
   N := Length(AList);
@@ -190,6 +173,7 @@ begin
     var
       Items: TArray<TVfsEntry>;
       Err: TVfsError;
+      Folder: TPlatformFolder;
     begin
       Err := TVfsError.Ok;
       Err.URI := URI;
@@ -199,28 +183,8 @@ begin
           Err := TVfsError.Make(vecCancelled, 'Cancelled', URI)
         else
         begin
-          AddSysFolder(Items, 'Desktop', CSIDL_DESKTOPDIRECTORY);
-          AddSysFolder(Items, 'Documents', CSIDL_PERSONAL);
-          AddSysFolder(Items, 'Downloads', CSIDL_PROFILE);
-          try
-            if TDirectory.Exists(TPath.Combine(GetSpecialFolderPath(CSIDL_PROFILE), 'Downloads')) then
-              Items[High(Items)].TargetURI := PathToFileUri(TPath.Combine(GetSpecialFolderPath(CSIDL_PROFILE), 'Downloads'));
-          except
-          end;
-          if Length(Items) > 0 then
-            Items[High(Items)].Name := 'Downloads';
-
-          AddSysFolder(Items, 'Pictures', CSIDL_MYPICTURES);
-          AddSysFolder(Items, 'Music', CSIDL_MYMUSIC);
-          AddSysFolder(Items, 'Videos', CSIDL_MYVIDEO);
-          AddSysFolder(Items, 'Program Files', CSIDL_PROGRAM_FILES);
-          AddSysFolder(Items, 'Program Files (x86)', CSIDL_PROGRAM_FILESX86);
-          AddSysFolder(Items, 'Windows', CSIDL_WINDOWS);
-          AddSysFolder(Items, 'System32', CSIDL_SYSTEM);
-          AddSysFolder(Items, 'AppData (Roaming)', CSIDL_APPDATA);
-          AddSysFolder(Items, 'AppData (Local)', CSIDL_LOCAL_APPDATA);
-          AddSysFolder(Items, 'UserProfile', CSIDL_PROFILE);
-          AddSysFolder(Items, 'Common AppData', CSIDL_COMMON_APPDATA);
+          for Folder in PlatformSystemFolders do
+            AddSysFolder(Items, Folder);
         end;
       except
         on Ex: Exception do

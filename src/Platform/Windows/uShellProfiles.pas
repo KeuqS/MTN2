@@ -4,10 +4,10 @@ unit uShellProfiles;
   Resolves profile id -> CreateProcess command line + working directory.
   Supports automatic discovery of Windows Subsystem for Linux (WSL/WSL2) distros.
 
-  CROSS-PLATFORM: the profile set itself (cmd/PowerShell/pwsh/WSL)
-  is Windows-specific, not just the CreateProcess plumbing -- a POSIX build
-  needs its own profile catalog (bash/zsh/fish, no WSL-discovery concept),
-  reusing the TShellProfileInfo/TShellProfileArray shape, not this data. }
+  The profile set itself (cmd/PowerShell/pwsh/WSL) is Windows-specific. The
+  Posix build, with a catalog of the installed login shells, lives in
+  Platform\Posix; each project puts exactly one of the two directories on its
+  unit search path. }
 
 interface
 

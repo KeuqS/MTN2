@@ -46,11 +46,11 @@ procedure TrimUtf8SampleTail(var ABytes: TBytes);
 implementation
 
 uses
-  Winapi.Windows;
+  uPlatformInfo;
 
 function OemEncoding: TEncoding;
 begin
-  Result := TEncoding.GetEncoding(Integer(GetOEMCP));
+  Result := TEncoding.GetEncoding(PlatformOemCodePage);
 end;
 
 { Byte-for-char fallback when TEncoding cannot map the buffer. }

@@ -183,7 +183,7 @@ type
 implementation
 
 uses
-  System.IOUtils,
+  System.IOUtils, uPlatformFileOps,
   uVfsRegistry;
 
 constructor TEditorDoc.Create;
@@ -457,19 +457,11 @@ begin
     procedure
     var
       Ro: Boolean;
-      {$WARN SYMBOL_PLATFORM OFF}
-      Attrs: TFileAttributes;
-      {$WARN SYMBOL_PLATFORM ON}
     begin
       Ro := False;
       try
         if TFile.Exists(WinApiPath(Path)) then
-        begin
-          {$WARN SYMBOL_PLATFORM OFF}
-          Attrs := TFile.GetAttributes(WinApiPath(Path));
-          Ro := TFileAttribute.faReadOnly in Attrs;
-          {$WARN SYMBOL_PLATFORM ON}
-        end;
+          Ro := PlatformIsReadOnlyFile(Path);
       except
         Ro := False;
       end;
@@ -1414,9 +1406,6 @@ end;
 function TEditorDoc.TryClearOsReadOnly(out AError: string): Boolean;
 var
   Path: string;
-  {$WARN SYMBOL_PLATFORM OFF}
-  Attrs: TFileAttributes;
-  {$WARN SYMBOL_PLATFORM ON}
 begin
   Result := False;
   AError := '';
@@ -1427,11 +1416,7 @@ begin
     Exit;
   end;
   try
-    {$WARN SYMBOL_PLATFORM OFF}
-    Attrs := TFile.GetAttributes(WinApiPath(Path));
-    Exclude(Attrs, TFileAttribute.faReadOnly);
-    TFile.SetAttributes(WinApiPath(Path), Attrs);
-    {$WARN SYMBOL_PLATFORM ON}
+    PlatformClearReadOnly(Path);
   except
     on E: Exception do
     begin

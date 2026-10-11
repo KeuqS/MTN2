@@ -160,7 +160,7 @@ begin
   Bad := '';
   N := 0;
   // Runner working dir is src\tests\dialogs.
-  for F in TDirectory.GetFiles(TPath.GetFullPath('..\..\dialogs'), '*.json',
+  for F in TDirectory.GetFiles(TPath.GetFullPath('../../dialogs'), '*.json',
     TSearchOption.soAllDirectories) do
     if TryParseDialogJson(TFile.ReadAllText(F, TEncoding.UTF8), D) then
     begin

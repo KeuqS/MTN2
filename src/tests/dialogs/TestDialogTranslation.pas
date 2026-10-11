@@ -77,7 +77,7 @@ var
 begin
   Bad := '';
   // Runner working dir is src\tests\dialogs.
-  for F in TDirectory.GetFiles(TPath.GetFullPath('..\..\dialogs'), '*.json',
+  for F in TDirectory.GetFiles(TPath.GetFullPath('../../dialogs'), '*.json',
     TSearchOption.soAllDirectories) do
   begin
     Root := TJSONObject.ParseJSONValue(TFile.ReadAllText(F, TEncoding.UTF8));

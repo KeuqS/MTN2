@@ -20,7 +20,7 @@ uses
 
 type
   TConPtyOutputEvent = reference to procedure(const AText: string);
-  TConPtyExitEvent = reference to procedure(AExitCode: DWORD);
+  TConPtyExitEvent = reference to procedure(AExitCode: Cardinal);
 
   /// <summary>Long-lived panel / workspace shell session (SDS §5.4).
   /// Implemented by TConPtySession.</summary>

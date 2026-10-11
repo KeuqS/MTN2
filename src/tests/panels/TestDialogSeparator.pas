@@ -37,7 +37,7 @@ end;
 function LoadDisplay: TDialogDeclaration;
 begin
   Assert.IsTrue(TryParseDialogJson(
-    TFile.ReadAllText('..\..\dialogs\display.json', TEncoding.UTF8), Result),
+    TFile.ReadAllText('../../dialogs/display.json', TEncoding.UTF8), Result),
     'display.json failed to parse');
 end;
 

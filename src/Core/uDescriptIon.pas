@@ -37,7 +37,8 @@ begin
   if TFile.Exists(Result) then
     Exit;
   if TDirectory.Exists(ADir) then
-    for Found in TDirectory.GetFiles(ADir, '*.ion') do
+    // Every file is looked at: a name pattern is case-sensitive on Linux.
+    for Found in TDirectory.GetFiles(ADir) do
       if SameText(TPath.GetFileName(Found), cFileName) then
         Exit(Found);
 end;

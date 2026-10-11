@@ -18,6 +18,7 @@ type
 implementation
 
 uses
+  uTestPaths,
   System.SysUtils, System.Classes, System.UITypes, System.IOUtils,
   System.RegularExpressions,
   uKeyChord, uTerminalWorkspace;
@@ -119,7 +120,7 @@ var
   I: Integer;
 begin
   // Runner working dir is src\tests\core.
-  Root := TPath.GetFullPath(TPath.Combine(GetCurrentDir, '..\..'));
+  Root := TPath.GetFullPath(TPath.Combine(GetCurrentDir, NativePath('../..')));
   Hits := '';
   for Dir in TArray<string>.Create('Core', 'Forms') do
     for F in TDirectory.GetFiles(TPath.Combine(Root, Dir), '*.pas') do

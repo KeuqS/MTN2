@@ -9,7 +9,7 @@ type
   [TestFixture]
   TTestDualPanelCmdLine = class
   public
-    [Test] procedure TestPathResolve;
+    [Test] [Category('WindowsOnly')] procedure TestPathResolve;
     [Test] procedure TestCompletionHelpers;
     [Test] procedure TestTabAndHistory;
     [Test] procedure TestHistoryKeepsCurrentLine;

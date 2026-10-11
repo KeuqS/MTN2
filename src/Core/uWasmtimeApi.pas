@@ -16,7 +16,7 @@ unit uWasmtimeApi;
 interface
 
 uses
-  System.SysUtils, Winapi.Windows;
+  System.SysUtils;
 
 const
   WASM_I32 = 0;
@@ -173,16 +173,16 @@ procedure WasmtimeClearTrap(var ATrap: PWasmTrap);
 implementation
 
 uses
-  System.IOUtils;
+  System.IOUtils, uPlatformInfo;
 
 var
-  GLib: HMODULE = 0;
+  GLib: NativeUInt = 0;
   GFns: TWasmtimeFns;
   GLoaded: Boolean = False;
 
 function Need(const AName: AnsiString; out AProc): Boolean;
 begin
-  Pointer(AProc) := GetProcAddress(GLib, PAnsiChar(AName));
+  Pointer(AProc) := PlatformGetProc(GLib, string(AName));
   Result := Assigned(Pointer(AProc));
 end;
 
@@ -194,14 +194,14 @@ begin
   if (Env <> '') and TFile.Exists(Env) then
     Exit(Env);
   ExeDir := ExcludeTrailingPathDelimiter(ExtractFilePath(ParamStr(0)));
-  Result := TPath.Combine(ExeDir, 'wasmtime.dll');
+  Result := TPath.Combine(ExeDir, PlatformSharedLibName('wasmtime'));
   if TFile.Exists(Result) then
     Exit;
-  Result := TPath.Combine(TPath.Combine(ExeDir, 'wasmtime'), 'wasmtime.dll');
+  Result := TPath.Combine(TPath.Combine(ExeDir, 'wasmtime'), PlatformSharedLibName('wasmtime'));
   if TFile.Exists(Result) then
     Exit;
   ToolsDir := ExcludeTrailingPathDelimiter(ExtractFilePath(ExcludeTrailingPathDelimiter(ExeDir)));
-  Result := TPath.Combine(TPath.Combine(ToolsDir, 'wasmtime'), 'wasmtime.dll');
+  Result := TPath.Combine(TPath.Combine(ToolsDir, 'wasmtime'), PlatformSharedLibName('wasmtime'));
   if TFile.Exists(Result) then
     Exit;
   Result := '';
@@ -278,16 +278,16 @@ begin
     AError := 'wasmtime.dll not found (set MTN2_WASMTIME_DLL)';
     Exit(False);
   end;
-  GLib := LoadLibrary(PChar(Path));
+  GLib := PlatformLoadLibrary(Path);
   if GLib = 0 then
   begin
-    AError := Format('LoadLibrary(%s) failed (GetLastError=%d)', [Path, GetLastError]);
+    AError := Format('LoadLibrary(%s) failed (%s)', [Path, PlatformLibraryError]);
     Exit(False);
   end;
   if not AllWasmtimeExportsPresent then
   begin
     AError := 'wasmtime.dll is missing a required C API export (need v26 c-api)';
-    FreeLibrary(GLib);
+    PlatformFreeLibrary(GLib);
     GLib := 0;
     FillChar(GFns, SizeOf(GFns), 0);
     Exit(False);

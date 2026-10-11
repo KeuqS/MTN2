@@ -12,8 +12,8 @@ interface
 
 uses
   System.SysUtils, System.Classes, System.UITypes, System.Math, System.Rtti,
-  FMX.Platform,
-  Winapi.Windows,
+  uClipboardService,
+  uPlatformInfo,
   uTerminalTypes, uThemeTypes, uThemeDrawing, uTerminalWindow, uConsoleBuffer, uConPty,
   uShellProfiles, uShellProfileOptions, uTerminalKeys, uDialogTypes, uDialogHost,
   uInputLine, uKeyChord, uConsoleSettings;
@@ -496,7 +496,7 @@ end;
 procedure TBaseConsoleWindow.NotifyHost;
 begin
   FNotifyDirty     := False;
-  FLastNotifyTick  := GetTickCount64;
+  FLastNotifyTick  := PlatformTickCount64;
   Invalidate;
   if Assigned(FOnContentChanged) then
     FOnContentChanged(Self);
@@ -507,7 +507,7 @@ var
   Gen: Integer;
 begin
   FNotifyDirty := True;
-  if (GetTickCount64 - FLastNotifyTick) >= cMinNotifyMs then
+  if (PlatformTickCount64 - FLastNotifyTick) >= cMinNotifyMs then
   begin
     NotifyHost;
     Exit;
@@ -862,26 +862,15 @@ end;
 { ---- Clipboard ------------------------------------------------------------- }
 
 procedure TBaseConsoleWindow.ClipboardSetText(const AText: string);
-var
-  Svc: IFMXClipboardService;
 begin
   if AText = '' then
     Exit;
-  if TPlatformServices.Current.SupportsPlatformService(IFMXClipboardService, Svc) then
-    Svc.SetClipboard(AText);
+  uClipboardService.SetClipboardText(AText);
 end;
 
 function TBaseConsoleWindow.ClipboardGetText: string;
-var
-  Svc: IFMXClipboardService;
-  V: TValue;
 begin
-  Result := '';
-  if not TPlatformServices.Current.SupportsPlatformService(IFMXClipboardService, Svc) then
-    Exit;
-  V := Svc.GetClipboard;
-  if not V.IsEmpty and V.IsType<string> then
-    Result := V.AsString;
+  Result := uClipboardService.GetClipboardText;
 end;
 
 procedure TBaseConsoleWindow.CopySelection;
@@ -1035,7 +1024,7 @@ begin
       AppendOutput(AChunk);
     end;
   OnExitEvt :=
-    procedure(AExitCode: DWORD)
+    procedure(AExitCode: Cardinal)
     begin
       if not Alive or (Gen <> FCallbackGen) then
         Exit;

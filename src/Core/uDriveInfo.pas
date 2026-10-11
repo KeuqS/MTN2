@@ -1,39 +1,23 @@
 unit uDriveInfo;
 
-{ Enumerate local drive letters for the Alt+F1/F2 Change Drive popup.
-
-  CROSS-PLATFORM: drive letters are a Windows-only concept, not
-  just a Windows-only API call -- a POSIX port needs a different UI concept
-  here (mounted filesystems under a single '/' tree), not a drop-in
-  replacement for EnumLogicalDrives. Callers keying off TDriveInfo.Letter
-  (uDualPanelWindow.pas, uDualPanelDrivePopup.pas) will need a parallel path
-  for that case, not just a portable data source. }
+{ Volume list for the Alt+F1/F2 Change Drive popup, with caching and
+  formatting. The volumes come from uPlatformDrives: drive letters on
+  Windows, mount points (each given a letter) on Posix systems. }
 
 interface
 
 uses
-  System.SysUtils;
+  System.SysUtils, uDriveTypes;
 
 type
-  TDriveInfo = record
-    Letter: Char;
-    RootPath: string;    // e.g. 'C:\'
-    KindLabel: string;   // Hard disk / Removable / Network / ...
-    FsName: string;      // NTFS, FAT32, ...
-    LabelOrPath: string; // volume label or UNC for network
-    TotalBytes: Int64;
-    FreeBytes: Int64;
-    SerialNumber: Cardinal;
-    VolumeFlags: Cardinal;
-  end;
+  TDriveInfo = uDriveTypes.TDriveInfo;
+  TDriveInfoArray = uDriveTypes.TDriveInfoArray;
 
-  TDriveInfoArray = TArray<TDriveInfo>;
-
-/// <summary>Letters + KindLabel only -- GetLogicalDriveStrings/GetDriveType,
-/// no GetVolumeInformation/GetDiskFreeSpaceEx. Those two touch the actual
-/// filesystem and can block for a long time (even minutes) on an
-/// unresponsive network share; GetDriveType does not. Safe to call from a
-/// paint routine every frame -- see EnumDriveBarGlyphs.</summary>
+/// <summary>Letters + KindLabel only -- never touches the volume itself.
+/// The detail queries touch the actual filesystem and can block for a long
+/// time (even minutes) on an unresponsive network share; the listing does
+/// not. Safe to call from a paint routine every frame -- see
+/// EnumDriveBarGlyphs.</summary>
 function EnumLogicalDrivesFast: TDriveInfoArray;
 /// <summary>Full detail (FsName/LabelOrPath/TotalBytes/FreeBytes) for every
 /// drive -- see EnumLogicalDrivesFast's warning. Never call this from a UI
@@ -59,7 +43,6 @@ procedure ForceRefreshDriveInfo(const AOnRefreshed: TProc = nil);
 /// drive letter up in CachedDriveInfo instead of querying it directly.</summary>
 function TryCachedPathVolume(const APath: string; out AInfo: TDriveInfo;
   const AOnRefreshed: TProc = nil): Boolean;
-function DriveKindLabel(ADriveType: Cardinal): string;
 function FormatDriveSize(ABytes: Int64): string;
 function FormatDrivePopupLine(const AInfo: TDriveInfo; AIsCurrent: Boolean;
   AInnerWidth: Integer): string;
@@ -116,9 +99,8 @@ procedure FitDriveBarGlyphs(AMaxWidth: Integer; out AGlyphs: TArray<Char>;
 implementation
 
 uses
-  System.Math, System.Classes,
-  Winapi.Windows,
-  uTerminalTypes, uVfsTypes, uStrings;
+  System.Math, System.Classes, System.SyncObjs,
+  uPlatformDrives, uTerminalTypes, uVfsTypes, uStrings;
 
 function ChangeDriveSpecialTitle(AIndex: Integer): string;
 const
@@ -136,19 +118,6 @@ begin
     Result := ''
   else
     Result := T('ui.driveKind.' + AKindLabel, AKindLabel);
-end;
-
-function DriveKindLabel(ADriveType: Cardinal): string;
-begin
-  case ADriveType of
-    DRIVE_REMOVABLE: Result := 'Removable';
-    DRIVE_FIXED:     Result := 'Hard disk';
-    DRIVE_REMOTE:    Result := 'Network';
-    DRIVE_CDROM:     Result := 'CD-ROM';
-    DRIVE_RAMDISK:   Result := 'RAM';
-  else
-    Result := '';
-  end;
 end;
 
 function FormatDriveSize(ABytes: Int64): string;
@@ -225,23 +194,11 @@ begin
     Result := Result + ' ';
 end;
 
-function RemoteConnectionName(const ARoot: string): string;
-var
-  Buf: array[0..512] of Char;
-  Len: DWORD;
-begin
-  Result := '';
-  Len := Length(Buf);
-  FillChar(Buf, SizeOf(Buf), 0);
-  if WNetGetConnection(PChar(Copy(ARoot, 1, 2)), Buf, Len) = NO_ERROR then
-    Result := string(Buf);
-end;
-
 function FormatVolumeSerial(ASerial: Cardinal): string;
 begin
   if ASerial = 0 then
     Exit('');
-  Result := Format('%.4X-%.4X', [HiWord(ASerial), LoWord(ASerial)]);
+  Result := Format('%.4X-%.4X', [ASerial shr 16, ASerial and $FFFF]);
 end;
 
 function FormatByteCount(ABytes: Int64): string;
@@ -298,147 +255,30 @@ begin
   Result := Format('%d%%, %s', [PercentOfTotal(APart, ATotal), FormatSizeFar(APart)]);
 end;
 
-function FillVolumeDetails(var AInfo: TDriveInfo; ADriveType: Cardinal): Boolean;
-var
-  VolName, FsName: array[0..255] of Char;
-  Serial, MaxComp, Flags: DWORD;
-  FreeAvail, TotalBytes, TotalFree: Int64;
-begin
-  Result := True;
-  FillChar(VolName, SizeOf(VolName), 0);
-  FillChar(FsName, SizeOf(FsName), 0);
-  Serial := 0;
-  MaxComp := 0;
-  Flags := 0;
-  AInfo.SerialNumber := 0;
-  try
-    if GetVolumeInformation(PChar(AInfo.RootPath), VolName, Length(VolName),
-      @Serial, MaxComp, Flags, FsName, Length(FsName)) then
-    begin
-      AInfo.FsName := string(FsName);
-      AInfo.LabelOrPath := string(VolName);
-      AInfo.SerialNumber := Serial;
-      AInfo.VolumeFlags := Flags;
-    end
-    else
-    begin
-      AInfo.FsName := '';
-      AInfo.LabelOrPath := '';
-      AInfo.VolumeFlags := 0;
-    end;
-  except
-    AInfo.FsName := '';
-    AInfo.LabelOrPath := '';
-  end;
-
-  if ADriveType = DRIVE_REMOTE then
-  begin
-    AInfo.LabelOrPath := RemoteConnectionName(AInfo.RootPath);
-    if AInfo.LabelOrPath = '' then
-      AInfo.LabelOrPath := AInfo.RootPath;
-  end;
-
-  AInfo.TotalBytes := 0;
-  AInfo.FreeBytes := 0;
-  try
-    FreeAvail := 0;
-    TotalBytes := 0;
-    TotalFree := 0;
-    if GetDiskFreeSpaceEx(PChar(AInfo.RootPath), FreeAvail, TotalBytes, @TotalFree) then
-    begin
-      AInfo.TotalBytes := TotalBytes;
-      AInfo.FreeBytes := FreeAvail;
-    end;
-  except
-    AInfo.TotalBytes := 0;
-    AInfo.FreeBytes := 0;
-  end;
-end;
-
 function TryQueryPathVolume(const APath: string; out AInfo: TDriveInfo): Boolean;
 var
-  Root: string;
-  Dt: Cardinal;
+  Letter: Char;
 begin
-  AInfo.Letter := #0;
-  AInfo.RootPath := '';
-  AInfo.KindLabel := '';
-  AInfo.FsName := '';
-  AInfo.LabelOrPath := '';
-  AInfo.TotalBytes := 0;
-  AInfo.FreeBytes := 0;
-  AInfo.SerialNumber := 0;
-  AInfo.VolumeFlags := 0;
-  Result := False;
-  Root := ExtractFileDrive(APath);
-  if Root = '' then
-    Exit;
-  if (Length(Root) >= 2) and (Root[2] = ':') then
-    AInfo.Letter := UpCase(Root[1])
-  else
-    Exit;
-  AInfo.RootPath := AInfo.Letter + ':' + PathDelim;
-  Dt := GetDriveType(PChar(AInfo.RootPath));
-  if Dt = DRIVE_NO_ROOT_DIR then
-    Exit;
-  AInfo.KindLabel := DriveKindLabel(Dt);
-  FillVolumeDetails(AInfo, Dt);
+  FillChar(AInfo, SizeOf(AInfo), 0);
+  Letter := PlatformDriveLetterOfPath(APath);
+  if (Letter = #0) or not PlatformDriveByLetter(Letter, AInfo) then
+    Exit(False);
+  PlatformFillDriveDetails(AInfo);
   Result := True;
-end;
-
-function EnumLogicalDrivesCore(AFillDetails: Boolean): TDriveInfoArray;
-var
-  Buf: array[0..512] of Char;
-  P: PChar;
-  Root: string;
-  Info: TDriveInfo;
-  List: TDriveInfoArray;
-  N: Integer;
-  Dt: Cardinal;
-begin
-  SetLength(List, 0);
-  FillChar(Buf, SizeOf(Buf), 0);
-  if GetLogicalDriveStrings(Length(Buf) - 1, Buf) = 0 then
-    Exit(List);
-
-  P := Buf;
-  while P^ <> #0 do
-  begin
-    Root := string(P);
-    if (Length(Root) >= 2) and (Root[2] = ':') then
-    begin
-      Dt := GetDriveType(PChar(Root));
-      if Dt <> DRIVE_NO_ROOT_DIR then
-      begin
-        Info.Letter := UpCase(Root[1]);
-        Info.RootPath := Info.Letter + ':' + PathDelim;
-        Info.KindLabel := DriveKindLabel(Dt);
-        Info.FsName := '';
-        Info.LabelOrPath := '';
-        Info.TotalBytes := 0;
-        Info.FreeBytes := 0;
-        Info.SerialNumber := 0;
-        Info.VolumeFlags := 0;
-        if AFillDetails then
-          FillVolumeDetails(Info, Dt);
-        N := Length(List);
-        SetLength(List, N + 1);
-        List[N] := Info;
-      end;
-    end;
-    Inc(P, StrLen(P) + 1);
-  end;
-  Result := List;
 end;
 
 function EnumLogicalDrivesFast: TDriveInfoArray;
 begin
-  Result := EnumLogicalDrivesCore(False);
+  Result := PlatformListDrives;
 end;
 
 function EnumLogicalDrives: TDriveInfoArray;
+var
+  I: Integer;
 begin
-  Result := EnumLogicalDrivesCore(True);
+  Result := PlatformListDrives;
+  for I := 0 to High(Result) do
+    PlatformFillDriveDetails(Result[I]);
 end;
 
 var
@@ -446,11 +286,11 @@ var
   /// worker stuck on an unresponsive drive can wake up after the RTL has
   /// shut the memory manager down, and must still be able to take the lock
   /// to see GDriveInfoShuttingDown.</summary>
-  GDriveInfoLock: TRTLCriticalSection;
+  GDriveInfoLock: Integer; // 0 free, 1 held; see LockDriveInfo
   GDriveInfoCache: TDriveInfoArray;
   GDriveInfoCacheReady: Boolean;
   /// <summary>Drive letters with a worker thread currently running
-  /// FillVolumeDetails for them -- the per-drive dedup key. A drive stuck
+  /// PlatformFillDriveDetails for them -- the per-drive dedup key. A drive stuck
   /// here forever (an unresponsive network share) simply never gets
   /// re-queried; it does NOT block any other drive's worker or result.</summary>
   GDriveInfoInFlight: TArray<Char>;
@@ -460,14 +300,18 @@ var
   /// leave without touching either (see StartDriveWorker).</summary>
   GDriveInfoShuttingDown: Boolean;
 
-procedure LockDriveInfo; inline;
+// A spin lock on a global integer: critical sections and monitors live on
+// the heap, which a late-waking worker must not touch (see GDriveInfoLock).
+// The guarded sections only copy small arrays.
+procedure LockDriveInfo;
 begin
-  EnterCriticalSection(GDriveInfoLock);
+  while TInterlocked.CompareExchange(GDriveInfoLock, 1, 0) <> 0 do
+    Sleep(1);
 end;
 
-procedure UnlockDriveInfo; inline;
+procedure UnlockDriveInfo;
 begin
-  LeaveCriticalSection(GDriveInfoLock);
+  TInterlocked.Exchange(GDriveInfoLock, 0);
 end;
 
 /// <summary>True once a drive's cache entry carries real detail (as opposed
@@ -512,7 +356,7 @@ begin
 end;
 
 /// <summary>One worker per drive letter -- an unresponsive P: hanging
-/// forever in FillVolumeDetails must not stop C:/D:/... from getting their
+/// forever in PlatformFillDriveDetails must not stop C:/D:/... from getting their
 /// real (size/label) data; a single shared background pass over all drives
 /// would have blocked on P: and left every other drive's result stuck at
 /// "letters only" too.</summary>
@@ -525,20 +369,10 @@ begin
     procedure
     var
       Info: TDriveInfo;
-      Dt: Cardinal;
       Idx: Integer;
     begin
-      Info.Letter := ALetter;
-      Info.RootPath := ALetter + ':' + PathDelim;
-      Dt := GetDriveType(PChar(Info.RootPath));
-      Info.KindLabel := DriveKindLabel(Dt);
-      Info.FsName := '';
-      Info.LabelOrPath := '';
-      Info.TotalBytes := 0;
-      Info.FreeBytes := 0;
-      Info.SerialNumber := 0;
-      Info.VolumeFlags := 0;
-      FillVolumeDetails(Info, Dt); // the slow part -- may block for a long time
+      PlatformDriveByLetter(ALetter, Info);
+      PlatformFillDriveDetails(Info); // the slow part -- may block for a long time
       LockDriveInfo;
       if GDriveInfoShuttingDown then
       begin
@@ -546,7 +380,7 @@ begin
         // releasing this frame's strings or the TThread object would fault.
         // The process is ending anyway -- leave without any RTL cleanup.
         UnlockDriveInfo;
-        ExitThread(0);
+        PlatformAbandonThread;
       end;
       try
         RemoveInFlight(ALetter);
@@ -679,10 +513,7 @@ end;
 
 function DriveLetterFromPath(const APath: string): Char;
 begin
-  if (Length(APath) >= 2) and (APath[2] = ':') then
-    Result := UpCase(APath[1])
-  else
-    Result := #0;
+  Result := PlatformDriveLetterOfPath(APath);
 end;
 
 function IndexOfDriveLetter(const ADrives: TDriveInfoArray; ALetter: Char): Integer;
@@ -839,7 +670,6 @@ begin
 end;
 
 initialization
-  InitializeCriticalSection(GDriveInfoLock);
 
 finalization
   // Workers blocked on an unresponsive drive outlive the main block; stop

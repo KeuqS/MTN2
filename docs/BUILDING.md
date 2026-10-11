@@ -30,6 +30,32 @@
 
 Запуск: `bin\MTN2.exe [--no-skia] [--fps] [путь]`. Ключи (`--no-skia`, `--fps` – кадры и время кадра в заголовке, путь новой вкладкой, служебные `--wait-pid` и `--self-check`) – [ARCHITECTURE.md](ARCHITECTURE.md) §10.
 
+## Сборка под Linux
+
+Терминальная версия `mtn2-tui` собирается компилятором Delphi для Linux64 (`dcclinux64`) прямо из Windows,
+без IDE и PAServer. Нужны RAD Studio 13 и файлы Linux SDK (sysroot): их скачивает диспетчер SDK в IDE
+(*Tools → Options → Deployment → SDK Manager*, Ubuntu 22.04 или 24.04) в
+`Documents\Embarcadero\Studio.0\PlatformSDKs\Linux64.sdk`. Запускать и проверять – в WSL.
+
+```powershell
+./src/build-linux.ps1                 # -> bin\linux64\mtn2-tui
+./src/build-linux.ps1 -Dump           # собрать и нарисовать один экран текстом в WSL
+./src/tests/run-tests-linux.ps1       # те же тестовые группы, собранные под Linux64 и запущенные в WSL
+```
+
+Платформенный код лежит в парах юнитов с одним именем: `src/Platform/Windows` и `src/Platform/Posix`;
+проект берёт одну из папок через путь поиска юнитов, `{$IFDEF}` в общем коде не нужен. Общий код –
+`src/Core`, терминальный хост – `src/Hosts/Ansi`, оконный (FireMonkey) – `src/Hosts/Fmx` и `src/Forms`.
+`src/tools/check-platform.ps1` падает, если юнит в `Core` или `Forms` обращается к платформенному API
+напрямую (список исключений – `platform-baseline.txt`, он может только сокращаться).
+
+Ресурсы Linux-программ (`MTN2Tui.dres`) собирает `src/tools/make-linux-resources.ps1` из `MTN2Resource.rc`
+и добавляет `RESOURCE_INDEX` – список имён, потому что среда выполнения Linux не умеет перечислять ресурсы.
+
+Фикстуры, проверяющие код только для Windows, перечислены в `src/tests/linux-excluded.txt`; отдельные тесты
+помечаются `[Category('WindowsOnly')]`. Тесты, которым нужна платформа POSIX (`TestPosixPaths`,
+`TestPosixPty`, `TestPosixShellProfiles`), на Windows завершаются сразу через `Assert.Pass`.
+
 ## Тесты
 
 Тесты написаны на [DUnitX](https://github.com/VSoftTechnologies/DUnitX) (входит в RAD Studio). Каждый
@@ -46,7 +72,7 @@
 | `dialogs` | JSON-диалоги, рендер, история ввода, отдельные диалоги |
 | `vfs` | файловые операции, VFS, архивы, SFTP, диски, длинные пути |
 | `plugins` | плагинный хост, загрузчик, 7z/tmp/WASM-плагины (`SamplePlugin.dpr` – фикстура) |
-| `core` | конфигурация, keymap, шина сообщений, строки, справка |
+| `core` | конфигурация, keymap, шина сообщений, строки, справка, разбор ввода и вывод терминального хоста |
 
 ```powershell
 ./src/tests/run-tests.ps1                    # все группы, кроме фикстур категории Manual

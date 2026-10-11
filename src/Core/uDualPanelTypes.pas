@@ -229,7 +229,7 @@ implementation
 
 uses
   System.Generics.Collections, System.Generics.Defaults, uFindSession, uFileFind,
-  uCharWidth;
+  uCharWidth, uPlatformPaths;
 
 function MakeTab(AId: Cardinal; const ATitle, AURI: string): TTab;
 begin
@@ -638,7 +638,9 @@ begin
     if Attr.IsDirectory then
     begin
       NameText := Attr.Name + '/';
-      if Attr.IsLink then
+      if Attr.IsLink and PlatformPosixPaths then
+        SizeText := '<LINK>'
+      else if Attr.IsLink then
         SizeText := '<JUNC>'
       else
         SizeText := '<DIR>';
