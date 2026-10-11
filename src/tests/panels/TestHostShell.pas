@@ -1,6 +1,6 @@
-unit TestTuiShell;
+unit TestHostShell;
 
-{ The program behind the text-terminal host (Hosts\Ansi\uTuiShell): it takes
+{ The program behind the text-terminal host (Hosts\Common\uHostShell): it takes
   decoded terminal events and returns the character grid to show. }
 
 interface
@@ -10,7 +10,7 @@ uses
 
 type
   [TestFixture]
-  TTestTuiShell = class
+  TTestHostShell = class
   public
     [Test] procedure TestComposeShowsThePanels;
     [Test] procedure TestKeysDriveTheWindows;
@@ -24,7 +24,7 @@ implementation
 
 uses
   System.SysUtils, System.Classes, System.UITypes, System.Generics.Collections,
-  uTerminalTypes, uTermInput, uTuiShell;
+  uTerminalTypes, uTermInput, uHostShell;
 
 function ScreenText(const AGrid: TTerminalGrid): string;
 var
@@ -58,12 +58,12 @@ begin
   Result.Row := ARow;
 end;
 
-procedure TTestTuiShell.TestComposeShowsThePanels;
+procedure TTestHostShell.TestComposeShowsThePanels;
 var
-  Shell: TTuiShell;
+  Shell: THostShell;
   Text: string;
 begin
-  Shell := TTuiShell.Create(100, 30);
+  Shell := THostShell.Create(100, 30);
   try
     Text := ScreenText(Shell.Compose);
     Assert.IsTrue(Text.Contains('Left'), 'the menu bar');
@@ -76,11 +76,11 @@ begin
   end;
 end;
 
-procedure TTestTuiShell.TestKeysDriveTheWindows;
+procedure TTestHostShell.TestKeysDriveTheWindows;
 var
-  Shell: TTuiShell;
+  Shell: THostShell;
 begin
-  Shell := TTuiShell.Create(100, 30);
+  Shell := THostShell.Create(100, 30);
   try
     Shell.Compose;
     Shell.HandleEvent(KeyEvent(vkF7));
@@ -94,12 +94,12 @@ begin
   end;
 end;
 
-procedure TTestTuiShell.TestResizeReshapesTheScreen;
+procedure TTestHostShell.TestResizeReshapesTheScreen;
 var
-  Shell: TTuiShell;
+  Shell: THostShell;
   Grid: TTerminalGrid;
 begin
-  Shell := TTuiShell.Create(100, 30);
+  Shell := THostShell.Create(100, 30);
   try
     Shell.Resize(70, 20);
     Assert.IsTrue(Shell.Dirty, 'a new size asks for a new frame');
@@ -114,11 +114,11 @@ begin
   end;
 end;
 
-procedure TTestTuiShell.TestQuitKey;
+procedure TTestHostShell.TestQuitKey;
 var
-  Shell: TTuiShell;
+  Shell: THostShell;
 begin
-  Shell := TTuiShell.Create(100, 30);
+  Shell := THostShell.Create(100, 30);
   try
     Assert.IsFalse(Shell.Quit);
     Shell.HandleEvent(KeyEvent(vkF10));
@@ -128,15 +128,15 @@ begin
   end;
 end;
 
-procedure TTestTuiShell.TestBytesFromTheTerminal;
+procedure TTestHostShell.TestBytesFromTheTerminal;
 var
-  Shell: TTuiShell;
+  Shell: THostShell;
   Parser: TTermInputParser;
   Events: TList<TTermEvent>;
   Bytes: TBytes;
   E: TTermEvent;
 begin
-  Shell := TTuiShell.Create(100, 30);
+  Shell := THostShell.Create(100, 30);
   Parser := TTermInputParser.Create;
   Events := TList<TTermEvent>.Create;
   try
@@ -160,11 +160,11 @@ begin
   end;
 end;
 
-procedure TTestTuiShell.TestMouseClickOpensAMenu;
+procedure TTestHostShell.TestMouseClickOpensAMenu;
 var
-  Shell: TTuiShell;
+  Shell: THostShell;
 begin
-  Shell := TTuiShell.Create(100, 30);
+  Shell := THostShell.Create(100, 30);
   try
     Shell.Compose;
     // The first menu item sits at the left end of the top row.
@@ -178,6 +178,6 @@ begin
 end;
 
 initialization
-  TDUnitX.RegisterTestFixture(TTestTuiShell);
+  TDUnitX.RegisterTestFixture(TTestHostShell);
 
 end.

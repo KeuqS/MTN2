@@ -262,7 +262,7 @@ begin
   if not SplitArchiveUri(ADestURI, Base, Segs) then
     Exit;
   Result := Base.StartsWith('file:', True) and
-    IsZipFileName(TPath.GetFileName(FileUriToPath(Base)));
+    IsZipFileName(SafeFileName(FileUriToPath(Base)));
 end;
 
 function JobDestRejectedReason(AKind: TPanelJobKind; const ADestURI: string): string;

@@ -197,7 +197,7 @@ begin
   Path := FileUriToPath(AURI);
   if Path <> '' then
   begin
-    Result := TPath.GetFileName(ExcludeTrailingPathDelimiter(Path));
+    Result := SafeFileName(ExcludeTrailingPathDelimiter(Path));
     if Result = '' then
       Result := 'item';
     Exit;
@@ -446,7 +446,7 @@ begin
   else
   begin
     Result.Size := 0;
-    Result.Extension := LowerCase(TPath.GetExtension(Name));
+    Result.Extension := LowerCase(SafeExtension(Name));
   end;
 end;
 

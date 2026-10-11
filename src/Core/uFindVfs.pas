@@ -197,7 +197,7 @@ begin
             end;
             Path := Data.Hits[I].Path;
             E.Name := DisplayNameForHit(Data.RootPath, Path);
-            E.Extension := LowerCase(TPath.GetExtension(Path));
+            E.Extension := LowerCase(SafeExtension(Path));
             E.MatchLine := Data.Hits[I].Line;
             E.MatchSnippet := Data.Hits[I].Snippet;
             E.IsDirectory := False;

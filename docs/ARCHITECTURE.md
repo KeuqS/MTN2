@@ -400,7 +400,7 @@ file:///D:/data/bundle.zip!/nested.zip!/a.txt
 
 ### 8.4. Платформенные слои: Windows и Linux
 
-Платформенный код лежит в двух каталогах с одинаковыми именами юнитов: `src/Platform/Windows` и `src/Platform/Posix`. `MTN2.dpr` подключает юниты `Platform\Windows` явными путями, `build-linux.ps1` ставит в путь поиска `Core;Platform\Posix;Hosts\Ansi`, поэтому одно и то же `uses uPlatformPaths` в общем коде попадает в нужный слой. Условной компиляции (`{$IFDEF MSWINDOWS}`) в `Core`, `Forms` и `Hosts` нет; допустима только внутри юнита платформенного слоя.
+Платформенный код лежит в двух каталогах с одинаковыми именами юнитов: `src/Platform/Windows` и `src/Platform/Posix`. `MTN2.dpr` подключает юниты `Platform\Windows` явными путями, `build-linux.ps1` ставит в путь поиска `Core;Platform\Posix;Hosts\Ansi;Hosts\Common;Hosts\Sdl`, поэтому одно и то же `uses uPlatformPaths` в общем коде попадает в нужный слой. Условной компиляции (`{$IFDEF MSWINDOWS}`) в `Core`, `Forms` и `Hosts` нет; допустима только внутри юнита платформенного слоя.
 
 Правила для общего кода (`Core`, `Hosts`):
 - `Winapi.*`, `Posix.*` и платформенные константы – только в `Platform\*`; `Forms\uMainForm.pas` и `Hosts\Fmx` – графическая оболочка Windows и подчиняются другим правилам.
@@ -416,7 +416,22 @@ file:///D:/data/bundle.zip!/nested.zip!/a.txt
 - `uPlatformFileAttr.pas`, `uPlatformFileOps.pas`, `uLinkUtils.pas` – атрибуты R/H/S/A, владелец и ACL, junction'ы на Windows; права доступа, владелец, символические и жёсткие ссылки на Linux.
 - `uElevation.pas`, `uElevatedVfs.pas` – операции с правами администратора: UAC-помощник на Windows, команды через `sudo` на Linux.
 - `uWinFileDragDrop.pas` – OLE drag-out; на Linux – буфер обмена файлов через `xclip` или `wl-copy`.
-- `uOverlayRenderer.pas` – просмотр картинки поверх сетки: на Windows растром, на Linux блочными символами через `chafa`. `DrawOverlayPreview` и `ShellIconBitmap` есть только в Windows-слое, потому что их вызывает графическая оболочка FMX, которой на Linux нет.
+- `uOverlayRenderer.pas` – просмотр картинки поверх сетки: на Windows растром, на Linux в текстовом терминале блочными символами через `chafa`, в окне SDL – пикселями (юнит `Hosts\Sdl\Platform\uOverlayRenderer.pas`, который `MTN2Sdl.dpr` подключает явным путём вместо юнита из `Platform\Posix`). `DrawOverlayPreview` и `ShellIconBitmap` есть только в Windows-слое, потому что их вызывает графическая оболочка FMX, которой на Linux нет.
+
+#### Хосты
+
+Над платформенным слоем лежит слой хоста: он решает, чем рисовать сетку символов и откуда брать ввод. `Hosts\Common\uHostShell.pas` – общий контроллер: тема, составитель окон с панелями и консолью, команды, которые окна просят у хоста, маршрутизация клавиш и мыши. Он принимает события `TTermEvent` (`uTermInput`) и возвращает сетку `TTerminalGrid`, о терминале и окнах ничего не знает. Хосты над ним: `Hosts\Ansi` (текстовый терминал, `MTN2Tui.dpr`), `Hosts\Sdl` (окно SDL2, `MTN2Sdl.dpr`) и графическая программа Windows (`Forms\uMainForm.pas`, `Hosts\Fmx`), у которой пока своя копия маршрутизации.
+
+Окно SDL2 (`Hosts\Sdl`):
+- `uSdlApi.pas` подключает SDL2 через `PlatformLoadLibrary`, событие хранит как 56 байт и читает по смещениям; `uSdlClipboard.pas` – буфер обмена рабочего стола как `IClipboardService`.
+- `uSdlInput.pas` превращает события SDL в `TTermEvent`: набранные символы берутся из событий текстового ввода, сочетания с Ctrl и Alt – из нажатий (буквы по физической клавише, поэтому работают в любой раскладке), позиции мыши в пикселях пересчитываются в ячейки, брошенный в окно файл приходит как вставленный путь.
+- `uPixelGrid.pas` рисует сетку в память (32 бита на пиксель), перерисовывает только изменённые ячейки и копит изменённый прямоугольник. Рамки и блочные символы рисует `uBoxGlyphs.pas` прямоугольниками, остальные символы берутся у `IGlyphSource`: `uFreeTypeGlyphs.pas` отдаёт глифы FreeType (`uFreeTypeApi.pas` читает структуры библиотеки по смещениям 64-битного Unix), для символов, которых нет в основном шрифте, файл шрифта ищет `PlatformFontFileForChar`.
+- Картинки быстрого просмотра: состояние хранит `uOverlayModel.pas`, декодирует `uSdlImage.pas` (BMP всегда, остальные форматы при установленной `libSDL2_image`), масштабирует `uPixelBlit.pas`; окно накладывает кадр на копию пикселей сетки.
+- `uSdlHost.pas` – окно, цикл `SDL_WaitEventTimeout` с `CheckSynchronize` и `ProcessCoreTimers`, потоковая текстура, которая обновляется только изменённым прямоугольником. `--snapshot=файл.png` рисует один кадр в PNG без окна (`uPngWriter.pas`).
+- Ядро не знает, чем рисует хост: `GModalDimPercent`, `GShadowCover` и `GGraphicsEngineLabel` в `uThemeDrawing.pas` задаёт сам хост (`Hosts\Fmx\uFmxRenderProfile.pas`, `uSdlMain.pas`, `uTuiMain.pas`).
+- Тесты – группа `tests\sdl`, она идёт на Windows и в WSL; проверки FreeType и SDL (с драйвером `dummy`) выполняются там, где библиотеки есть.
+
+В окне SDL пока нет значков оболочки (в колонке остаётся значок типа файла), ввода через IME и перетаскивания файлов из окна наружу; размер шрифта меняется в самом окне (`Ctrl` и колесо, `Ctrl+` и `Ctrl-`) и не сохраняется в сессии.
 
 Что остаётся в общем коде осознанно: разбор приглашений `cmd` и PowerShell в `uConsoleBuffer.pas` (на Linux применяется запасной признак `$`/`#`), каталог профилей оболочек с идентификаторами `cmd`, `powershell`, `pwsh` в `uConsoleLaunch.pas`, `uBaseConsoleWindow.pas`, `uTerminalWorkspace.pas`, а также протокол `uElevatedProtocol.pas`.
 

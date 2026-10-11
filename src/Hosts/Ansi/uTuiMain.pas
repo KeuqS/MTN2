@@ -13,9 +13,9 @@ implementation
 
 uses
   System.SysUtils, System.Classes, System.Generics.Collections, System.IOUtils,
-  uTerminalTypes, uTermInput, uAnsiFrame, uAnsiTerm, uAnsiClipboard, uTuiShell,
+  uTerminalTypes, uTermInput, uAnsiFrame, uAnsiTerm, uAnsiClipboard, uHostShell,
   uCoreTimer, uPlatformInfo, uUpdater, uConfigLocation, uResourceAccess, uSelfCheck,
-  uPlatformUpdate;
+  uPlatformUpdate, uThemeDrawing, uStrings;
 
 const
   cEscapeWaitMs = 30;
@@ -98,12 +98,12 @@ end;
 
 function RunDump(const AOptions: TTuiOptions): Integer;
 var
-  Shell: TTuiShell;
+  Shell: THostShell;
   Grid: TTerminalGrid;
   Y, X: Integer;
   Line: string;
 begin
-  Shell := TTuiShell.Create(AOptions.DumpCols, AOptions.DumpRows);
+  Shell := THostShell.Create(AOptions.DumpCols, AOptions.DumpRows);
   Shell.AttachPlugins(PluginsDir);
   try
     if AOptions.Path <> '' then
@@ -162,7 +162,7 @@ end;
 function RunTerminal(const AOptions: TTuiOptions): Integer;
 var
   Term: TAnsiTerm;
-  Shell: TTuiShell;
+  Shell: THostShell;
   Parser: TTermInputParser;
   Events: TList<TTermEvent>;
   Writer: TAnsiFrameWriter;
@@ -192,7 +192,7 @@ begin
         begin
           Term.WriteText(AText);
         end);
-      Shell := TTuiShell.Create(Cols, Rows);
+      Shell := THostShell.Create(Cols, Rows);
       Shell.AttachPlugins(PluginsDir);
       Shell.AttachUpdater;
       if AOptions.Path <> '' then
@@ -289,6 +289,11 @@ function RunTui: Integer;
 var
   Opts: TTuiOptions;
 begin
+  GGraphicsEngineLabel :=
+    function: string
+    begin
+      Result := T('ui.about.engine.tui', 'Graphics Engine: text terminal');
+    end;
   Opts := ParseOptions;
   if Opts.ShowHelp then
   begin

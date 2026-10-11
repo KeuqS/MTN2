@@ -273,7 +273,7 @@ begin
   // Display names may append '/' for directories - strip just in case.
   if (Base <> '') and (Base[Length(Base)] = '/') then
     Base := Copy(Base, 1, Length(Base) - 1);
-  Ext := LowerCase(TPath.GetExtension(Base));
+  Ext := LowerCase(SafeExtension(Base));
   if IsZipFileName(Base) or IsSevenZipFileName(Base) then
     Exit('archive');
   if IsExecutablePanelFileExt(Ext) then
@@ -328,7 +328,7 @@ begin
   if AIsDir or AIsParent then
     Result.Extension := ''
   else
-    Result.Extension := LowerCase(TPath.GetExtension(Base));
+    Result.Extension := LowerCase(SafeExtension(Base));
 end;
 
 function MakePanelRowFromEntry(const AEntry: TVfsEntry;
@@ -347,7 +347,7 @@ begin
   begin
     Result.Extension := AEntry.Extension;
     if Result.Extension = '' then
-      Result.Extension := LowerCase(TPath.GetExtension(AEntry.Name));
+      Result.Extension := LowerCase(SafeExtension(AEntry.Name));
   end;
   Result.CreatedText := FormatFileDate(AEntry.CreationTime);
   Result.AccessedText := FormatFileDate(AEntry.AccessTime);

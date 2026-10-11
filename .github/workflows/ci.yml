@@ -167,7 +167,7 @@ jobs:
         if: ${{ vars.LINUX_BUILD == 'true' }}
         shell: pwsh
         run: |
-          ./src/build-linux.ps1 -Rebuild
+          ./src/build-linux.ps1 -Rebuild -Sdl
           ./src/tests/run-tests-linux.ps1
           $LinuxVersion = if ($env:DEV_VERSION) { $env:DEV_VERSION } else { "0.0.0-ci" }
           ./src/tools/package-linux.ps1 -Version $LinuxVersion

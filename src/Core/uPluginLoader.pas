@@ -1248,11 +1248,11 @@ begin
   try
     DirFiles := TDirectory.GetFiles(APluginDir, '*', TSearchOption.soTopDirectoryOnly);
     for FileName in DirFiles do
-      if SameText(TPath.GetExtension(FileName), PlatformSharedLibExt) then
+      if SameText(SafeExtension(FileName), PlatformSharedLibExt) then
         Dlls.Add(FileName)
-      else if SameText(TPath.GetExtension(FileName), '.wat') then
+      else if SameText(SafeExtension(FileName), '.wat') then
         Wats.Add(FileName)
-      else if SameText(TPath.GetExtension(FileName), '.wasm') then
+      else if SameText(SafeExtension(FileName), '.wasm') then
         Wasms.Add(FileName);
     SetLength(Result, Dlls.Count + Wats.Count + Wasms.Count);
     I := 0;
@@ -1280,7 +1280,7 @@ end;
 
 function ExtensionKey(const AFileName: string): string;
 begin
-  Result := LowerCase(TPath.GetExtension(AFileName));
+  Result := LowerCase(SafeExtension(AFileName));
   if (Result <> '') and (Result[1] = '.') then
     Result := Copy(Result, 2, MaxInt);
 end;
@@ -1805,7 +1805,7 @@ begin
   FEnsuring := True;
   try
     for FileName in E.Files do
-      if SameText(TPath.GetExtension(FileName), PlatformSharedLibExt) then
+      if SameText(SafeExtension(FileName), PlatformSharedLibExt) then
         TryLoadOne(FileName, E.PluginId)
       else
         TryLoadOneWasm(FileName, E.PluginId);
@@ -1860,7 +1860,7 @@ begin
     Exit;
   for PluginDir in TDirectory.GetDirectories(ADir, '*', TSearchOption.soTopDirectoryOnly) do
   begin
-    PluginId := TPath.GetFileName(PluginDir);
+    PluginId := SafeFileName(PluginDir);
     E.PluginId := PluginId;
     E.Files := CollectPluginModules(PluginDir);
     E.Attempted := PluginIsLoaded(PluginId);
@@ -1952,13 +1952,13 @@ begin
     Exit;
   for PluginDir in TDirectory.GetDirectories(ADir, '*', TSearchOption.soTopDirectoryOnly) do
   begin
-    PluginId := TPath.GetFileName(PluginDir);
+    PluginId := SafeFileName(PluginDir);
     if IsDisabled(PluginId) then
       Continue;
     // dll, then wat, then wasm - same order as before the single scan.
     Modules := CollectPluginModules(PluginDir);
     for FileName in Modules do
-      if SameText(TPath.GetExtension(FileName), PlatformSharedLibExt) then
+      if SameText(SafeExtension(FileName), PlatformSharedLibExt) then
         TryLoadOne(FileName, PluginId)
       else
         TryLoadOneWasm(FileName, PluginId);

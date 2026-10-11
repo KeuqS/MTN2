@@ -480,7 +480,7 @@ begin
   if (Name = '.') or (Name = '..') or (Name = '') then
     Exit;
   AEntry.Name := Name;
-  AEntry.Extension := Copy(TPath.GetExtension(Name), 2, MaxInt);
+  AEntry.Extension := Copy(SafeExtension(Name), 2, MaxInt);
   AEntry.IsDirectory := (Perms[1] = 'd');
   if not TryStrToInt64(Fields[4], SizeVal) then
     SizeVal := 0;

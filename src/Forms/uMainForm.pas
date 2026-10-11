@@ -9,7 +9,7 @@ uses
   FMX.Controls.Presentation, FMX.StdCtrls, FMX.Menus,
   Winapi.Windows, Winapi.Messages, Winapi.ActiveX, Winapi.MultiMon,
   uTerminalTypes, uThemeTypes, uTerminalWindow, uDualPanelTypes, uDualPanelWindow,
-  uEditorWindow, uConsoleWindow, uMdiCompositor, uThemeRegistry, uThemeSpec, uThemeProxy,
+  uEditorWindow, uConsoleWindow, uMdiCompositor, uThemeRegistry, uThemeSpec, uThemeController, uKeyRouting,
   uTerminalRenderer, uSession, uWinFileDragDrop, uKeymap, uShellProfiles, uShellAssoc,
   uBaseConsoleWindow, uPluginHost, uPluginPanelServices, uVfsTypes, uColorCoding, uPanelColumns,
   uDisplaySettings, uConsoleSettings, uEditorSearch, uSettingsTransfer, uElevation, uStrings, uUpdateController, uToast, uFrameStats, uThemeDrawing, uChromeRows, uDualPanelDrag,
@@ -43,17 +43,10 @@ type
   private
     FRenderer: TTerminalRenderer;
     FTheme: IThemeRenderer;
-    /// <summary>Same object as FTheme, typed for SetInner - see uThemeProxy.
-    /// Every window/dialog/controller holds this one shared IThemeRenderer
-    /// reference, so switching FThemeProxy's inner theme repaints all of
-    /// them without recreating anything.</summary>
-    FThemeProxy: TThemeProxy;
-    /// <summary>uThemeRegistry id of the active theme (session.json's
-    /// 'theme'); kept in sync with FThemeProxy by SwitchTheme.</summary>
-    FThemeName: string;
-    /// <summary>Id of the session's theme that could not be loaded at start
-    /// ('' = it loaded); reported once the window exists.</summary>
-    FMissingThemeId: string;
+    /// <summary>The active theme: every window and dialog holds its shared
+    /// IThemeRenderer, so switching it repaints them all without recreating
+    /// anything.</summary>
+    FThemes: TThemeController;
     FMdi: TMdiCompositor;
     FDualPanel: TDualPanelWindow;
     FConsole: TConsoleWindow;
@@ -172,15 +165,7 @@ type
     procedure EnsureDemoWindows;
     procedure CaptureNormalBounds;
     procedure ApplySessionWindow(const AWindow: TMtnWindowBounds);
-    /// <summary>Loads the session's theme (uThemeRegistry id) at startup.
-    /// A missing theme falls back to the default one and is remembered in
-    /// FMissingThemeId; the coloring and Markdown color files of earlier
-    /// versions are imported as a user theme first.</summary>
-    procedure LoadStartupTheme(const AThemeId, ALegacyThemeFile: string);
-    /// <summary>Points FThemeProxy at ASpec and hands its file coloring to
-    /// the panels.</summary>
-    procedure ApplyThemeSpec(const ASpec: TThemeSpec);
-    /// <summary>Live theme switch: repoints FThemeProxy at the theme
+    /// <summary>Live theme switch: repoints the shared theme at the theme
     /// AThemeId - every open window/dialog picks it up on its next repaint,
     /// no recreation needed - and remembers it for PersistSession. An
     /// unknown id selects the default theme.</summary>
@@ -280,41 +265,9 @@ type
     procedure ChangeConsoleProfile(const AProfileId: string);
     function DispatchTerminalKey(var Key: Word; var KeyChar: Char;
       Shift: TShiftState): Boolean;
-    /// <summary>One dispatch target DispatchTerminalKey tries in order;
-    /// each checks its own guard and, if it applies, forwards the key and
-    /// reports whether it was consumed. Factored out so DispatchTerminalKey
-    /// itself reads as a flat priority list.</summary>
-    function TryDispatchDualPanelDialogKey(var Key: Word; var KeyChar: Char;
-      Shift: TShiftState): Boolean;
-    function TryDispatchBareEscapeKey(var Key: Word; var KeyChar: Char;
-      Shift: TShiftState): Boolean;
-    function TryDispatchConsoleScrollKey(var Key: Word; var KeyChar: Char;
-      Shift: TShiftState): Boolean;
-    function TryDispatchPanelCmdlineKey(var Key: Word; var KeyChar: Char;
-      Shift: TShiftState): Boolean;
-    function TryDispatchMdiActiveKey(var Key: Word; var KeyChar: Char;
-      Shift: TShiftState): Boolean;
-    function TryDispatchDualPanelGeneralKey(var Key: Word; var KeyChar: Char;
-      Shift: TShiftState): Boolean;
-    /// <summary>Common tail of every DispatchTerminalKey branch that
-    /// consumed the key: zero it out, repaint, report handled.</summary>
+    /// <summary>Common tail of DispatchTerminalKey when a window took
+    /// the keystroke: zero it out, repaint, report handled.</summary>
     function ConsumeTerminalKey(var Key: Word; var KeyChar: Char): Boolean;
-    /// <summary>True for Esc with no modifiers -- the "restore panels from
-    /// ConsoleMode" shortcut's guard, factored out of DispatchTerminalKey's
-    /// if-condition so it reads as one named check instead of four.</summary>
-    function IsBareEscape(Key: Word; Shift: TShiftState): Boolean;
-    /// <summary>True for paging/arrow navigation -- half of
-    /// IsConsoleScrollOrSelectionKey.</summary>
-    function IsConsoleNavigationKey(Key: Word): Boolean;
-    /// <summary>True for Ctrl+C/Ctrl+A (copy/select-all, not Alt-combined)
-    /// -- the other half of IsConsoleScrollOrSelectionKey.</summary>
-    function IsConsoleCopySelectAllKey(Key: Word; KeyChar: Char;
-      Shift: TShiftState): Boolean;
-    /// <summary>True for a key DispatchTerminalKey routes to the active
-    /// Console window while ConsoleMode owns input: paging/arrow
-    /// navigation, or Ctrl+C/Ctrl+A for copy/select-all.</summary>
-    function IsConsoleScrollOrSelectionKey(Key: Word; KeyChar: Char;
-      Shift: TShiftState): Boolean;
     /// <summary>True while ConsoleMode owns input and the active MDI child
     /// really is FConsole -- the shared guard for routing keys to it.</summary>
     function IsConsoleActiveInConsoleMode: Boolean;
@@ -323,7 +276,6 @@ type
     /// keeps the menu from stealing Alt) and KeyUp swallows it identically
     /// on release; shared so the two never drift apart.</summary>
     function IsAltGrDown: Boolean;
-    function IsModifierOnlyKey(AKey: Word): Boolean;
     /// <summary>Ctrl+Alt+K, any Shift-of-K/k -- the keymap.json hot-reload
     /// shortcut FormKeyDown checks before dispatch (see its call site for
     /// why: the panel/cmdline would otherwise absorb the letter first).</summary>
@@ -1594,59 +1546,17 @@ begin
   FGridSnapDone := False;
 end;
 
-procedure TMainForm.ApplyThemeSpec(const ASpec: TThemeSpec);
-begin
-  FThemeProxy.SetInner(uThemeRegistry.CreateThemeFromSpec(ASpec));
-  uColorCoding.SetActiveColorCodingGroups(ASpec.FileColoring);
-end;
-
-procedure TMainForm.LoadStartupTheme(const AThemeId, ALegacyThemeFile: string);
-var
-  Id, ImportedId: string;
-  Spec: TThemeSpec;
-begin
-  Id := AThemeId;
-  if Id = '' then
-    Id := uThemeRegistry.DefaultThemeId;
-  if uThemeRegistry.ImportLegacyFiles(Id, ALegacyThemeFile, ImportedId) then
-    Id := ImportedId;
-  FMissingThemeId := '';
-  if not uThemeRegistry.TryLoadThemeSpec(Id, Spec) then
-  begin
-    FMissingThemeId := Id;
-    Id := uThemeRegistry.DefaultThemeId;
-    if not uThemeRegistry.TryLoadThemeSpec(Id, Spec) then
-      Spec := ResolveThemeSpec(nil);
-  end;
-  FThemeName := Id;
-  FThemeProxy := TThemeProxy.Create(uThemeRegistry.CreateThemeFromSpec(Spec));
-  uColorCoding.SetActiveColorCodingGroups(Spec.FileColoring);
-end;
-
 procedure TMainForm.SwitchTheme(const AThemeId: string);
-var
-  Id: string;
-  Spec: TThemeSpec;
 begin
-  if not Assigned(FThemeProxy) then
-    Exit;
-  Id := AThemeId;
-  if not uThemeRegistry.TryLoadThemeSpec(Id, Spec) then
-  begin
-    Id := uThemeRegistry.DefaultThemeId;
-    if not uThemeRegistry.TryLoadThemeSpec(Id, Spec) then
-      Exit;
-  end;
-  ApplyThemeSpec(Spec);
-  FThemeName := Id;
-  Recompose;
+  if Assigned(FThemes) and FThemes.Switch(AThemeId) then
+    Recompose;
 end;
 
 procedure TMainForm.ThemePreview(const ASpec: TThemeSpec);
 begin
-  if not Assigned(FThemeProxy) then
+  if not Assigned(FThemes) then
     Exit;
-  ApplyThemeSpec(ASpec);
+  FThemes.Apply(ASpec);
   Recompose;
 end;
 
@@ -1657,7 +1567,7 @@ end;
 
 function TMainForm.GetActiveThemeId: string;
 begin
-  Result := FThemeName;
+  Result := FThemes.ThemeId;
 end;
 
 function TMainForm.GetConsoleProfile: string;
@@ -1901,9 +1811,9 @@ begin
   end;
   Sess.ConsoleStartOnLaunch := FSession.ConsoleStartOnLaunch;
   Sess.ConsoleCwdToPanels := FSession.ConsoleCwdToPanels;
-  // FThemeName is the live theme (switched via the Theme dialog or
+  // The controller holds the live theme (switched via the Theme dialog or
   // loaded from session.json at startup) - always the source of truth here.
-  Sess.ThemeName := FThemeName;
+  Sess.ThemeName := FThemes.ThemeId;
   Sess.ThemeFile := '';
   if Assigned(FRenderer) then
   begin
@@ -2700,8 +2610,8 @@ begin
 
   SetLocale(PeekSessionLanguage);
   PeekSessionTheme(SessionThemeNameValue, SessionThemeFileValue);
-  LoadStartupTheme(SessionThemeNameValue, SessionThemeFileValue);
-  FTheme := FThemeProxy;
+  FThemes := TThemeController.Create(SessionThemeNameValue, True, SessionThemeFileValue);
+  FTheme := FThemes.Theme;
   FMdi := TMdiCompositor.Create(FTheme);
   EnsureDemoWindows;
 
@@ -2743,11 +2653,11 @@ begin
   if StartupPathArgument <> '' then
     OpenPathFromArgument(StartupPathArgument);
   SyncRenderer;
-  if (FMissingThemeId <> '') and Assigned(FDualPanel) then
+  if (FThemes.MissingId <> '') and Assigned(FDualPanel) then
     FDualPanel.ShowInfo(T('ui.theme.title', 'Theme'),
       Format(T('ui.theme.notFound',
         'Theme "%s" was not found; the classic Far theme is used.'),
-        [FMissingThemeId]));
+        [FThemes.MissingId]));
 
   // Optional pre-warm (Commands -> Background console, "Start shell at
   // program launch"). Off by default: the shell starts on the first Ctrl+O
@@ -2928,7 +2838,7 @@ begin
   FConsole := nil;
   FreeAndNil(FMdi);
   FTheme := nil;
-  FThemeProxy := nil;
+  FreeAndNil(FThemes);
   ReleaseSingleInstance;
 end;
 
@@ -3576,34 +3486,9 @@ begin
   Result := True;
 end;
 
-function TMainForm.IsBareEscape(Key: Word; Shift: TShiftState): Boolean;
-begin
-  Result := TKeyChord.Make(Key, #0, Shift).Matches(vkEscape);
-end;
-
-function TMainForm.IsConsoleNavigationKey(Key: Word): Boolean;
-begin
-  Result := (Key = vkPrior) or (Key = vkNext) or (Key = vkHome) or (Key = vkEnd) or
-    (Key = vkUp) or (Key = vkDown) or (Key = vkLeft) or (Key = vkRight);
-end;
-
-function TMainForm.IsConsoleCopySelectAllKey(Key: Word; KeyChar: Char;
-  Shift: TShiftState): Boolean;
-begin
-  Result := TKeyChord.Make(Key, KeyChar, Shift).MatchesLetter('C', [ssCtrl], [ssShift]) or
-    TKeyChord.Make(Key, KeyChar, Shift).MatchesLetter('A', [ssCtrl], [ssShift]);
-end;
-
-function TMainForm.IsConsoleScrollOrSelectionKey(Key: Word; KeyChar: Char;
-  Shift: TShiftState): Boolean;
-begin
-  Result := IsConsoleNavigationKey(Key) or IsConsoleCopySelectAllKey(Key, KeyChar, Shift);
-end;
-
 function TMainForm.IsConsoleActiveInConsoleMode: Boolean;
 begin
-  Result := Assigned(FDualPanel) and FDualPanel.ConsoleMode and Assigned(FMdi) and
-    Assigned(FMdi.Active) and (FMdi.Active = FConsole);
+  Result := uKeyRouting.IsConsoleActiveInConsoleMode(FDualPanel, FMdi, FConsole);
 end;
 
 // AltGr = Right Alt + the synthetic Left Ctrl Windows adds for it, with no
@@ -3614,13 +3499,6 @@ begin
     (GetKeyState(VK_LMENU) >= 0) and (GetKeyState(VK_RCONTROL) >= 0);
 end;
 
-function TMainForm.IsModifierOnlyKey(AKey: Word): Boolean;
-begin
-  Result := (AKey = vkMenu) or (AKey = vkControl) or (AKey = vkShift) or
-    (AKey = vkLShift) or (AKey = vkRShift) or (AKey = vkLControl) or (AKey = vkRControl) or
-    (AKey = vkLMenu) or (AKey = vkRMenu);
-end;
-
 function TMainForm.IsReloadKeymapShortcut(AKey: Word; AKeyChar: Char;
   AShift: TShiftState): Boolean;
 begin
@@ -3628,63 +3506,9 @@ begin
     AShift) = kaReloadKeymap;
 end;
 
-// Host form dialogs (MkDir/Copy/...) live on Dual Panel - must win over the
-// active MDI window (Console/Editor) so Enter reaches the default button.
-function TMainForm.TryDispatchDualPanelDialogKey(var Key: Word; var KeyChar: Char;
-  Shift: TShiftState): Boolean;
-begin
-  Result := Assigned(FDualPanel) and FDualPanel.Visible and FDualPanel.DialogVisible and
-    FDualPanel.HandleInput(Key, Shift, KeyChar);
-end;
-
-// Esc in ConsoleMode always restores panels (never stops the running command
-// - Ctrl+C does that). Routed through FConsole.HandleInput first so an
-// active scrollback selection is cleared before dismissing, same as
-// click-away. Routed here because DualPanel.HandleInput exits early while
-// ConsoleMode is on, so focus on F-keys / status would otherwise swallow Esc.
-function TMainForm.TryDispatchBareEscapeKey(var Key: Word; var KeyChar: Char;
-  Shift: TShiftState): Boolean;
-begin
-  Result := IsBareEscape(Key, Shift) and Assigned(FDualPanel) and FDualPanel.ConsoleMode and
-    Assigned(FConsole);
-  if Result then
-    FConsole.HandleInput(Key, Shift, KeyChar);
-end;
-
-// Console scroll / selection while ConsoleMode (cmdline is hidden; input is in Console).
-function TMainForm.TryDispatchConsoleScrollKey(var Key: Word; var KeyChar: Char;
-  Shift: TShiftState): Boolean;
-begin
-  Result := IsConsoleActiveInConsoleMode and IsConsoleScrollOrSelectionKey(Key, KeyChar, Shift) and
-    FMdi.Active.HandleInput(Key, Shift, KeyChar);
-end;
-
-// Panel cmdline owns typing when focused (panel mode only).
-function TMainForm.TryDispatchPanelCmdlineKey(var Key: Word; var KeyChar: Char;
-  Shift: TShiftState): Boolean;
-begin
-  Result := Assigned(FDualPanel) and FDualPanel.Visible and FDualPanel.CmdFocused and
-    not FDualPanel.ConsoleMode and FDualPanel.HandleInput(Key, Shift, KeyChar);
-end;
-
-function TMainForm.TryDispatchMdiActiveKey(var Key: Word; var KeyChar: Char;
-  Shift: TShiftState): Boolean;
-begin
-  Result := Assigned(FMdi) and Assigned(FMdi.Active) and
-    FMdi.Active.HandleInput(Key, Shift, KeyChar);
-end;
-
-function TMainForm.TryDispatchDualPanelGeneralKey(var Key: Word; var KeyChar: Char;
-  Shift: TShiftState): Boolean;
-begin
-  Result := Assigned(FDualPanel) and FDualPanel.Visible and
-    FDualPanel.HandleInput(Key, Shift, KeyChar);
-end;
-
 function TMainForm.DispatchTerminalKey(var Key: Word; var KeyChar: Char;
   Shift: TShiftState): Boolean;
 begin
-  Result := False;
   SyncKeyModifiers(Shift);
   // FMX sometimes delivers Tab/Enter only as KeyChar with Key=0.
   if (Key = 0) and (KeyChar = #9) then
@@ -3696,38 +3520,14 @@ begin
     if (Key = 10) or (Key = 13) then
       Key := vkReturn;
   end;
-
-  if TryDispatchDualPanelDialogKey(Key, KeyChar, Shift) then
-    Exit(ConsumeTerminalKey(Key, KeyChar));
-
-  if TryDispatchBareEscapeKey(Key, KeyChar, Shift) then
-    Exit(ConsumeTerminalKey(Key, KeyChar));
-
-  if TryDispatchConsoleScrollKey(Key, KeyChar, Shift) then
-    Exit(ConsumeTerminalKey(Key, KeyChar));
-
-  if TryDispatchPanelCmdlineKey(Key, KeyChar, Shift) then
-    Exit(ConsumeTerminalKey(Key, KeyChar));
-
-  if TryDispatchMdiActiveKey(Key, KeyChar, Shift) then
-    Exit(ConsumeTerminalKey(Key, KeyChar));
-
-  if TryDispatchDualPanelGeneralKey(Key, KeyChar, Shift) then
-    Exit(ConsumeTerminalKey(Key, KeyChar));
+  Result := RouteTerminalKey(FDualPanel, FMdi, FConsole, Key, KeyChar, Shift);
+  if Result then
+    ConsumeTerminalKey(Key, KeyChar);
 end;
 
 procedure TMainForm.SyncKeyModifiers(Shift: TShiftState);
-var
-  Changed: Boolean;
 begin
-  Changed := False;
-  // Dual Panel owns shared chrome in ConsoleMode and when panels are active.
-  if Assigned(FDualPanel) and FDualPanel.Visible then
-    Changed := FDualPanel.SetKeyModifiers(Shift) or Changed;
-  // Focused Viewer/Editor draw their own F-bar / status.
-  if Assigned(FMdi) and Assigned(FMdi.Active) and (FMdi.Active <> FDualPanel) then
-    Changed := FMdi.Active.SetKeyModifiers(Shift) or Changed;
-  if Changed then
+  if uKeyRouting.SyncKeyModifiers(FDualPanel, FMdi, Shift) then
     Recompose;
 end;
 

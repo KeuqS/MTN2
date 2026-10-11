@@ -148,6 +148,14 @@ function LocalPathIsFile(const APath: string): Boolean;
 /// messages on the plain path. Not for Shell APIs (SHFileOperation,
 /// IFileOperation, ShellExecute): they reject the prefix.</summary>
 function WinApiPath(const APath: string): string;
+/// <summary>TPath.GetFileName that also accepts a name with control
+/// characters (valid on Linux, and on NTFS volumes mounted there), where TPath
+/// raises.</summary>
+function SafeFileName(const APath: string): string;
+/// <summary>TPath.GetExtension with the same tolerance.</summary>
+function SafeExtension(const APath: string): string;
+/// <summary>TPath.GetDirectoryName with the same tolerance.</summary>
+function SafeDirectoryName(const APath: string): string;
 function DriveLetterOf(const APath: string): Char;
 /// <summary>Local paths compare case-insensitively on Windows, exactly
 /// elsewhere.</summary>
@@ -499,6 +507,61 @@ begin
   Result := PlatformIsFile(WinApiPath(P));
 end;
 
+function HasControlChars(const S: string): Boolean;
+var
+  C: Char;
+begin
+  for C in S do
+    if Ord(C) < 32 then
+      Exit(True);
+  Result := False;
+end;
+
+function LastPathSeparator(const S: string): Integer;
+begin
+  Result := Length(S);
+  while (Result > 0) and (S[Result] <> '/') and
+        (PlatformPosixPaths or (S[Result] <> PathDelim)) do
+    Dec(Result);
+end;
+
+function SafeFileName(const APath: string): string;
+begin
+  if not HasControlChars(APath) then
+    Exit(TPath.GetFileName(APath));
+  Result := Copy(APath, LastPathSeparator(APath) + 1, MaxInt);
+end;
+
+function SafeExtension(const APath: string): string;
+var
+  Name: string;
+  I: Integer;
+begin
+  if not HasControlChars(APath) then
+    Exit(TPath.GetExtension(APath));
+  Name := SafeFileName(APath);
+  I := Length(Name);
+  while (I > 0) and (Name[I] <> '.') do
+    Dec(I);
+  if I > 0 then
+    Result := Copy(Name, I, MaxInt)
+  else
+    Result := '';
+end;
+
+function SafeDirectoryName(const APath: string): string;
+var
+  I: Integer;
+begin
+  if not HasControlChars(APath) then
+    Exit(TPath.GetDirectoryName(APath));
+  I := LastPathSeparator(APath);
+  if I <= 1 then
+    Result := Copy(APath, 1, I)
+  else
+    Result := Copy(APath, 1, I - 1);
+end;
+
 function DriveLetterOf(const APath: string): Char;
 var
   P: string;
@@ -816,7 +879,7 @@ begin
     Path := ArchiveBaseLocalPath(Base);
     if Path = '' then
       Exit('');
-    Parent := TPath.GetDirectoryName(ExcludeTrailingPathDelimiter(Path));
+    Parent := SafeDirectoryName(ExcludeTrailingPathDelimiter(Path));
     if Parent = '' then
       Result := PathToFileUri(Path)
     else
@@ -915,7 +978,7 @@ function IsZipFileName(const AName: string): Boolean;
 var
   Ext: string;
 begin
-  Ext := LowerCase(TPath.GetExtension(AName));
+  Ext := LowerCase(SafeExtension(AName));
   Result := (Ext = '.zip') or (Ext = '.jar') or (Ext = '.apk');
 end;
 
@@ -947,7 +1010,7 @@ function IsSevenZipFileName(const AName: string): Boolean;
 var
   Ext: string;
 begin
-  Ext := LowerCase(TPath.GetExtension(AName));
+  Ext := LowerCase(SafeExtension(AName));
   Result := (Ext = '.7z') or (Ext = '.rar') or (Ext = '.tar') or
     (Ext = '.gz') or (Ext = '.tgz') or (Ext = '.bz2') or (Ext = '.xz') or
     (Ext = '.iso') or (Ext = '.cab') or (Ext = '.wim');
@@ -1000,7 +1063,7 @@ begin
   // By name, or by content for a ZIP under another name opened with
   // Ctrl+PgDn (docx, odt). The content check keeps a folder whose name ends
   // in '!' (D:\Work\Wow!\file.txt) on the file system.
-  Result := IsZipFileName(TPath.GetFileName(FileUriToPath(Base))) or
+  Result := IsZipFileName(SafeFileName(FileUriToPath(Base))) or
     FileHasZipSignature(FileUriToPath(Base));
 end;
 
@@ -1413,7 +1476,7 @@ begin
   Path := FileUriToPath(AURI);
   if IsLocalRoot(Path) then
     Exit(PathToFileUri(Path));
-  Parent := TPath.GetDirectoryName(ExcludeTrailingPathDelimiter(Path));
+  Parent := SafeDirectoryName(ExcludeTrailingPathDelimiter(Path));
   if (Parent = '') or SameLocalPath(NormalizeLocalPath(Parent), NormalizeLocalPath(Path)) then
     Result := PathToFileUri(Path)
   else
@@ -1453,7 +1516,7 @@ begin
   begin
     // Outer zip root -> directory containing the zip file.
     Path := ArchiveBaseLocalPath(ABase);
-    Parent := TPath.GetDirectoryName(ExcludeTrailingPathDelimiter(Path));
+    Parent := SafeDirectoryName(ExcludeTrailingPathDelimiter(Path));
     if Parent = '' then
       Result := PathToFileUri(Path)
     else
@@ -1555,7 +1618,7 @@ begin
     if IsWindowsDriveRoot(Path) then
       Exit(UpCase(Path[1]) + ':');
     Path := ExcludeTrailingPathDelimiter(Path);
-    Result := TPath.GetFileName(Path);
+    Result := SafeFileName(Path);
     if Result = '' then
       Result := Path;
     Exit;
@@ -1564,21 +1627,21 @@ begin
     Exit(AURI);
   if Length(Segs) = 0 then
   begin
-    Result := TPath.GetFileName(ArchiveBaseLocalPath(Base));
+    Result := SafeFileName(ArchiveBaseLocalPath(Base));
     Exit;
   end;
   Last := Segs[High(Segs)];
   if Last = '' then
   begin
     if Length(Segs) = 1 then
-      Result := TPath.GetFileName(ArchiveBaseLocalPath(Base))
+      Result := SafeFileName(ArchiveBaseLocalPath(Base))
     else
       Result := LastUriPathSegment(Segs[High(Segs) - 1]);
   end
   else
     Result := LastUriPathSegment(Last);
   if Result = '' then
-    Result := TPath.GetFileName(ArchiveBaseLocalPath(Base));
+    Result := SafeFileName(ArchiveBaseLocalPath(Base));
 end;
 
 // Shortens by characters; VfsUriDirTabTitle then accounts for wide ones.
@@ -1602,7 +1665,7 @@ begin
     Path := ExcludeTrailingPathDelimiter(Path);
     if Length(Path) <= AMaxLen then
       Exit(Path);
-    Tail := TPath.GetFileName(Path);
+    Tail := SafeFileName(Path);
     if Length(Tail) + 5 <= AMaxLen then
       Exit('/.../' + Tail);
     Exit(Copy(Tail, Max(Length(Tail) - AMaxLen + 1, 1), AMaxLen));
@@ -1626,7 +1689,7 @@ begin
   if AMaxLen <= Length(Drive) then
     Exit(Copy(Drive, 1, AMaxLen));
 
-  Tail := TPath.GetFileName(Path);
+  Tail := SafeFileName(Path);
   if Tail = '' then
     Tail := Path;
   Avail := AMaxLen - Length(Drive); // columns left after 'C:'

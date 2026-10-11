@@ -111,7 +111,7 @@ begin
   P := Seg.LastDelimiter('/\');
   if P >= 0 then
     Seg := Seg.Substring(P + 1);
-  Result := LowerCase(TPath.GetExtension(Seg));
+  Result := LowerCase(SafeExtension(Seg));
 end;
 
 function OpenUriWithSystem(const AURI: string): Boolean;

@@ -851,6 +851,8 @@
     "toast.nothingToCopy": "Nichts zu kopieren",
     "about.engine.skia": "Grafik-Engine: Skia (mono AA + modales Abdunkeln)",
     "about.engine.gdi": "Grafik-Engine: Standard-GDI/FMX-Renderer",
+    "about.engine.tui": "Grafik-Engine: Textterminal",
+    "about.engine.sdl": "Grafik-Engine: SDL2 + FreeType",
     "update.failed": "MTN2 konnte nicht aktualisiert werden.",
     "update.noWrite": "Der Programmordner ist nicht beschreibbar.",
     "update.openPage": "Seite öffnen",

@@ -1,4 +1,4 @@
-unit uTuiShell;
+unit uHostShell;
 
 { The program behind the text-terminal host: the theme, the compositor with
   the dual panel window (documents and terminals live in its tabs) and the
@@ -11,16 +11,15 @@ interface
 
 uses
   System.SysUtils, System.Classes, System.Types, System.UITypes, System.Math,
-  uTerminalTypes, uThemeTypes, uThemeProxy, uThemeSpec, uMdiCompositor,
+  uTerminalTypes, uThemeTypes, uThemeController, uThemeSpec, uMdiCompositor,
   uDualPanelWindow, uConsoleWindow, uSession, uTermInput, uCoreTimer,
   uUpdateController, uDisplaySettings;
 
 type
-  TTuiShell = class
+  THostShell = class
   private
-    FThemeProxy: TThemeProxy;
+    FThemes: TThemeController;
     FTheme: IThemeRenderer;
-    FThemeName: string;
     FMdi: TMdiCompositor;
     FDualPanel: TDualPanelWindow;
     FConsole: TConsoleWindow;
@@ -40,9 +39,11 @@ type
     FLastClickCol: Integer;
     FLastClickRow: Integer;
     FButtonsDown: Integer;
+    // The window flags the shell changes for its lifetime.
+    FPrevTitleBar: Boolean;
+    FPrevPanelIcons: Boolean;
+    FPrevFileDrag: Boolean;
     procedure Recompose;
-    procedure LoadTheme(const AThemeId: string);
-    procedure ApplyThemeSpec(const ASpec: TThemeSpec);
     procedure SwitchTheme(const AThemeId: string);
     procedure RestoreSession;
     procedure ApplyChromeRows(AMenuBar, AKeyBar, AStatusLine: Boolean);
@@ -55,8 +56,6 @@ type
     procedure ShowPanelMode;
     procedure ApplyConsoleLayout;
     function IsConsoleActiveInConsoleMode: Boolean;
-    function IsConsoleScrollOrSelectionKey(AKey: Word; AKeyChar: Char;
-      AShift: TShiftState): Boolean;
     procedure SyncKeyModifiers(AShift: TShiftState);
     function DispatchTerminalKey(var AKey: Word; var AKeyChar: Char;
       AShift: TShiftState): Boolean;
@@ -145,7 +144,7 @@ uses
   uDualPanelDrag, uKeyChord, uDialogHost, uPlatformInfo, uTerminalWindow,
   uDualPanelUiTypes, uToast, uWindowChrome, uConsoleLaunch, uPluginHost,
   uPluginPanelServices, uPluginServices, uPluginUi, uPluginChrome, uDialogTypes, uVfsTypes,
-  uOverlayRenderer;
+  uOverlayRenderer, uKeyRouting;
 
 const
   cDefaultThemeFallback = 'NDN';
@@ -153,7 +152,7 @@ const
   cDriveCommitMs = 700;
   cAltReleaseMs = 1500;
 
-constructor TTuiShell.Create(ACols, ARows: Integer);
+constructor THostShell.Create(ACols, ARows: Integer);
 begin
   inherited Create;
   FCols := Max(ACols, 20);
@@ -161,8 +160,11 @@ begin
   FLastClickCol := -1;
   FLastClickRow := -1;
   ReloadKeymap('');
-  // The terminal has no window frame of its own to draw and no file icons;
-  // pictures come as colored cells.
+  // The shell draws no window frame of its own and has no bitmap file icons
+  // or drag-out; the flags go back when the shell is freed.
+  FPrevTitleBar := GShowTitleBar;
+  FPrevPanelIcons := GShowPanelIcons;
+  FPrevFileDrag := GFileDragEnabled;
   GShowTitleBar := True;
   GShowPanelIcons := False;
   GFileDragEnabled := False;
@@ -189,8 +191,8 @@ begin
 
   if TryLoadSession(DefaultSessionFilePath, FSession) then
     SetLocale(FSession.Language);
-  LoadTheme(FSession.ThemeName);
-  FTheme := FThemeProxy;
+  FThemes := TThemeController.Create(FSession.ThemeName);
+  FTheme := FThemes.Theme;
   FMdi := TMdiCompositor.Create(FTheme);
   CreateDualPanel;
   RestoreSession;
@@ -209,8 +211,11 @@ begin
   FDirty := True;
 end;
 
-destructor TTuiShell.Destroy;
+destructor THostShell.Destroy;
 begin
+  GShowTitleBar := FPrevTitleBar;
+  GShowPanelIcons := FPrevPanelIcons;
+  GFileDragEnabled := FPrevFileDrag;
   SetOverlayRepaintHandler(nil);
   FreeAndNil(FUpdateTimer);
   FreeAndNil(FUpdater);
@@ -236,11 +241,11 @@ begin
   end;
   FreeAndNil(FMdi);
   FTheme := nil;
-  FThemeProxy := nil;
+  FreeAndNil(FThemes);
   inherited Destroy;
 end;
 
-procedure TTuiShell.AttachPlugins(const APluginsDir: string);
+procedure THostShell.AttachPlugins(const APluginsDir: string);
 begin
   StartPluginHost(APluginsDir);
   // Dialogs a plugin asks for appear only over the panels, never inside an
@@ -273,7 +278,7 @@ begin
     end);
 end;
 
-procedure TTuiShell.DetachPlugins;
+procedure THostShell.DetachPlugins;
 begin
   SetPluginHostServices(Default(TPluginHostServices));
   SetPluginChromeChanged(nil);
@@ -281,74 +286,38 @@ begin
   StopPluginHost;
 end;
 
-procedure TTuiShell.Recompose;
+procedure THostShell.Recompose;
 begin
   FDirty := True;
 end;
 
 { ---- theme -------------------------------------------------------------- }
 
-procedure TTuiShell.ApplyThemeSpec(const ASpec: TThemeSpec);
+procedure THostShell.SwitchTheme(const AThemeId: string);
 begin
-  FThemeProxy.SetInner(uThemeRegistry.CreateThemeFromSpec(ASpec));
-  uColorCoding.SetActiveColorCodingGroups(ASpec.FileColoring);
+  if FThemes.Switch(AThemeId) then
+    Recompose;
 end;
 
-procedure TTuiShell.LoadTheme(const AThemeId: string);
-var
-  Id: string;
-  Spec: TThemeSpec;
-begin
-  Id := AThemeId;
-  if Id = '' then
-    Id := uThemeRegistry.DefaultThemeId;
-  if not uThemeRegistry.TryLoadThemeSpec(Id, Spec) then
-  begin
-    Id := uThemeRegistry.DefaultThemeId;
-    if not uThemeRegistry.TryLoadThemeSpec(Id, Spec) then
-      Spec := ResolveThemeSpec(nil);
-  end;
-  FThemeName := Id;
-  FThemeProxy := TThemeProxy.Create(uThemeRegistry.CreateThemeFromSpec(Spec));
-  uColorCoding.SetActiveColorCodingGroups(Spec.FileColoring);
-end;
-
-procedure TTuiShell.SwitchTheme(const AThemeId: string);
-var
-  Id: string;
-  Spec: TThemeSpec;
-begin
-  Id := AThemeId;
-  if not uThemeRegistry.TryLoadThemeSpec(Id, Spec) then
-  begin
-    Id := uThemeRegistry.DefaultThemeId;
-    if not uThemeRegistry.TryLoadThemeSpec(Id, Spec) then
-      Exit;
-  end;
-  ApplyThemeSpec(Spec);
-  FThemeName := Id;
-  Recompose;
-end;
-
-procedure TTuiShell.ThemeSelected(const AThemeId: string);
+procedure THostShell.ThemeSelected(const AThemeId: string);
 begin
   SwitchTheme(AThemeId);
 end;
 
-procedure TTuiShell.ThemePreview(const ASpec: TThemeSpec);
+procedure THostShell.ThemePreview(const ASpec: TThemeSpec);
 begin
-  ApplyThemeSpec(ASpec);
+  FThemes.Apply(ASpec);
   Recompose;
 end;
 
-function TTuiShell.GetActiveThemeId: string;
+function THostShell.GetActiveThemeId: string;
 begin
-  Result := FThemeName;
+  Result := FThemes.ThemeId;
 end;
 
 { ---- session ------------------------------------------------------------ }
 
-function TTuiShell.GetDisplaySettings: TDisplaySettings;
+function THostShell.GetDisplaySettings: TDisplaySettings;
 begin
   Result := DefaultDisplaySettings;
   Result.CursorBlink := FSession.CursorBlink;
@@ -366,7 +335,7 @@ begin
   Result.Language := CurrentLocale;
 end;
 
-procedure TTuiShell.ApplyDisplaySettings(const ASettings: TDisplaySettings);
+procedure THostShell.ApplyDisplaySettings(const ASettings: TDisplaySettings);
 var
   LanguageChanged: Boolean;
 begin
@@ -397,7 +366,7 @@ begin
   Recompose;
 end;
 
-procedure TTuiShell.ApplyChromeRows(AMenuBar, AKeyBar, AStatusLine: Boolean);
+procedure THostShell.ApplyChromeRows(AMenuBar, AKeyBar, AStatusLine: Boolean);
 begin
   GShowMenuBar := AMenuBar;
   GShowKeyBar := AKeyBar;
@@ -406,7 +375,7 @@ begin
     FConsole.LayoutBottomMargin := ChromeBottomRows;
 end;
 
-procedure TTuiShell.RestoreSession;
+procedure THostShell.RestoreSession;
 var
   Sess: TMtnSession;
 begin
@@ -436,7 +405,7 @@ begin
   GEditorSearchOptions.UseRegex := Sess.EditorSearchRegex;
 end;
 
-procedure TTuiShell.PersistSession;
+procedure THostShell.PersistSession;
 var
   Sess: TMtnSession;
 begin
@@ -452,7 +421,7 @@ begin
   end;
   Sess.TerminalCloseOnExit := FDualPanel.TerminalCloseOnExit;
   Sess.AutoSyncConsoleCwd := FDualPanel.AutoSyncConsoleCwd;
-  Sess.ThemeName := FThemeName;
+  Sess.ThemeName := FThemes.ThemeId;
   Sess.ThemeFile := '';
   Sess.ShowNotifications := GShowToasts;
   Sess.ShowMenuBar := GShowMenuBar;
@@ -480,7 +449,7 @@ end;
 
 { ---- windows ------------------------------------------------------------ }
 
-procedure TTuiShell.CreateDualPanel;
+procedure THostShell.CreateDualPanel;
 begin
   FDualPanel := TDualPanelWindow.Create(FTheme, FMdi.AllocId);
   FDualPanel.OnContentChanged := DualPanelContentChanged;
@@ -516,7 +485,7 @@ begin
   FMdi.AttachWindow(FDualPanel);
 end;
 
-function TTuiShell.EnsureConsole: TConsoleWindow;
+function THostShell.EnsureConsole: TConsoleWindow;
 var
   ProfileId: string;
 begin
@@ -543,18 +512,18 @@ begin
   Result := FConsole;
 end;
 
-procedure TTuiShell.SyncHiddenConsoleArea(ACols, ARows: Integer);
+procedure THostShell.SyncHiddenConsoleArea(ACols, ARows: Integer);
 begin
   if Assigned(FConsole) and not FConsole.Visible and (ACols > 0) and (ARows > 1) then
     FConsole.Area := TRectI.Make(0, 0, ACols - 1, Max(ARows - 1 - ChromeBottomRows, 1));
 end;
 
-procedure TTuiShell.ApplyConsoleLayout;
+procedure THostShell.ApplyConsoleLayout;
 begin
   FMdi.LayoutMaximized(FCols, FRows);
 end;
 
-procedure TTuiShell.ShowConsoleMode;
+procedure THostShell.ShowConsoleMode;
 begin
   EnsureConsole;
   FDualPanel.Visible := True;
@@ -567,7 +536,7 @@ begin
   FMdi.Activate(FConsole);
 end;
 
-procedure TTuiShell.ShowPanelMode;
+procedure THostShell.ShowPanelMode;
 var
   Cwd: string;
 begin
@@ -580,38 +549,37 @@ begin
   FMdi.Activate(FDualPanel);
 end;
 
-function TTuiShell.IsConsoleActiveInConsoleMode: Boolean;
+function THostShell.IsConsoleActiveInConsoleMode: Boolean;
 begin
-  Result := Assigned(FDualPanel) and FDualPanel.ConsoleMode and Assigned(FMdi) and
-    Assigned(FMdi.Active) and (FMdi.Active = FConsole);
+  Result := uKeyRouting.IsConsoleActiveInConsoleMode(FDualPanel, FMdi, FConsole);
 end;
 
 { ---- dual panel commands --------------------------------------------------- }
 
-procedure TTuiShell.DualPanelContentChanged(Sender: TObject);
+procedure THostShell.DualPanelContentChanged(Sender: TObject);
 begin
   Recompose;
 end;
 
-procedure TTuiShell.DualPanelQuitRequest(Sender: TObject);
+procedure THostShell.DualPanelQuitRequest(Sender: TObject);
 begin
   FQuit := True;
 end;
 
-procedure TTuiShell.DualPanelOpenUpdates(Sender: TObject);
+procedure THostShell.DualPanelOpenUpdates(Sender: TObject);
 begin
   if Assigned(FUpdater) then
     FUpdater.OpenUpdatesDialog;
 end;
 
-procedure TTuiShell.UpdateTimerTick(Sender: TObject);
+procedure THostShell.UpdateTimerTick(Sender: TObject);
 begin
   FUpdateTimer.Enabled := False;
   if Assigned(FUpdater) then
     FUpdater.StartupCheck;
 end;
 
-procedure TTuiShell.AttachUpdater;
+procedure THostShell.AttachUpdater;
 var
   Host: TUpdateHost;
 begin
@@ -648,7 +616,7 @@ begin
   FUpdateTimer.Enabled := True;
 end;
 
-procedure TTuiShell.DetachUpdater;
+procedure THostShell.DetachUpdater;
 begin
   if Assigned(FUpdateTimer) then
     FUpdateTimer.Enabled := False;
@@ -659,7 +627,7 @@ begin
   FreeAndNil(FUpdater);
 end;
 
-procedure TTuiShell.DualPanelOpenViewer(const AURI: string);
+procedure THostShell.DualPanelOpenViewer(const AURI: string);
 begin
   if AURI = '' then
     Exit;
@@ -668,7 +636,7 @@ begin
   Recompose;
 end;
 
-procedure TTuiShell.DualPanelOpenEditor(const AURI: string);
+procedure THostShell.DualPanelOpenEditor(const AURI: string);
 begin
   if AURI = '' then
     Exit;
@@ -677,7 +645,7 @@ begin
   Recompose;
 end;
 
-procedure TTuiShell.DualPanelRunCommand(const ACommand, AWorkingDir: string);
+procedure THostShell.DualPanelRunCommand(const ACommand, AWorkingDir: string);
 begin
   ShowConsoleMode;
   ApplyConsoleLayout;
@@ -685,21 +653,21 @@ begin
   Recompose;
 end;
 
-procedure TTuiShell.DualPanelRunInBackground(Sender: TObject);
+procedure THostShell.DualPanelRunInBackground(Sender: TObject);
 begin
   FPeekTimer.Enabled := False;
   FPeekTimer.Interval := ClampBackgroundShowMs(GConsoleSettings.BackgroundShowMs);
   FPeekTimer.Enabled := True;
 end;
 
-procedure TTuiShell.PeekTimerTick(Sender: TObject);
+procedure THostShell.PeekTimerTick(Sender: TObject);
 begin
   FPeekTimer.Enabled := False;
   if IsConsoleActiveInConsoleMode then
     ConsoleBackToPanels(Self);
 end;
 
-procedure TTuiShell.AltTimerTick(Sender: TObject);
+procedure THostShell.AltTimerTick(Sender: TObject);
 begin
   FAltTimer.Enabled := False;
   // No key release arrives from a terminal: Alt counts as released when no
@@ -709,7 +677,7 @@ begin
   Recompose;
 end;
 
-procedure TTuiShell.DriveTimerTick(Sender: TObject);
+procedure THostShell.DriveTimerTick(Sender: TObject);
 begin
   FDriveTimer.Enabled := False;
   // A terminal reports no key releases: the drive chosen with Ctrl+Left/Right
@@ -718,19 +686,19 @@ begin
   Recompose;
 end;
 
-procedure TTuiShell.DualPanelReturnWhenDone(Sender: TObject);
+procedure THostShell.DualPanelReturnWhenDone(Sender: TObject);
 begin
   if Assigned(FConsole) then
     FConsole.ReturnToPanelsWhenDone;
 end;
 
-procedure TTuiShell.DualPanelShellCwdSync(const APath: string);
+procedure THostShell.DualPanelShellCwdSync(const APath: string);
 begin
   if Assigned(FConsole) then
     FConsole.SyncWorkingDir(APath);
 end;
 
-function TTuiShell.DualPanelSaveConsoleOutput(const APath: string;
+function THostShell.DualPanelSaveConsoleOutput(const APath: string;
   out AError: string): Boolean;
 begin
   if not Assigned(FConsole) then
@@ -741,7 +709,7 @@ begin
   Result := FConsole.SaveOutputToFile(APath, AError);
 end;
 
-procedure TTuiShell.DualPanelClearConsoleBuffer(Sender: TObject);
+procedure THostShell.DualPanelClearConsoleBuffer(Sender: TObject);
 begin
   if Assigned(FConsole) then
   begin
@@ -750,7 +718,7 @@ begin
   end;
 end;
 
-procedure TTuiShell.DualPanelToggleConsole(Sender: TObject);
+procedure THostShell.DualPanelToggleConsole(Sender: TObject);
 begin
   if FDualPanel.ConsoleMode then
   begin
@@ -766,12 +734,12 @@ begin
   Recompose;
 end;
 
-procedure TTuiShell.DualPanelOpenTerminal(const AProfileId, ACwd: string);
+procedure THostShell.DualPanelOpenTerminal(const AProfileId, ACwd: string);
 begin
   DualPanelOpenTerminalWith(AProfileId, ACwd, '');
 end;
 
-procedure TTuiShell.DualPanelOpenTerminalWith(const AProfileId, ACwd, ACommand: string);
+procedure THostShell.DualPanelOpenTerminalWith(const AProfileId, ACwd, ACommand: string);
 begin
   if AProfileId = '' then
     Exit;
@@ -782,7 +750,7 @@ begin
   Recompose;
 end;
 
-function TTuiShell.DualPanelLaunchConsoleFile(const APath: string): Boolean;
+function THostShell.DualPanelLaunchConsoleFile(const APath: string): Boolean;
 var
   Kind: TLaunchFileKind;
   Cwd, Profile: string;
@@ -806,7 +774,7 @@ begin
   end;
 end;
 
-procedure TTuiShell.ChangeConsoleProfile(const AProfileId: string);
+procedure THostShell.ChangeConsoleProfile(const AProfileId: string);
 var
   ProfileId: string;
   WasVisible: Boolean;
@@ -836,7 +804,7 @@ begin
   Recompose;
 end;
 
-function TTuiShell.GetConsoleProfile: string;
+function THostShell.GetConsoleProfile: string;
 begin
   if Assigned(FConsole) then
     Result := FConsole.ProfileId
@@ -844,34 +812,34 @@ begin
     Result := FSession.BackgroundConsoleProfile;
 end;
 
-function TTuiShell.GetConsoleStartOnLaunch: Boolean;
+function THostShell.GetConsoleStartOnLaunch: Boolean;
 begin
   Result := FSession.ConsoleStartOnLaunch;
 end;
 
-procedure TTuiShell.SetConsoleStartOnLaunch(AValue: Boolean);
+procedure THostShell.SetConsoleStartOnLaunch(AValue: Boolean);
 begin
   FSession.ConsoleStartOnLaunch := AValue;
 end;
 
-function TTuiShell.GetConsoleCwdToPanels: Boolean;
+function THostShell.GetConsoleCwdToPanels: Boolean;
 begin
   Result := FSession.ConsoleCwdToPanels;
 end;
 
-procedure TTuiShell.SetConsoleCwdToPanels(AValue: Boolean);
+procedure THostShell.SetConsoleCwdToPanels(AValue: Boolean);
 begin
   FSession.ConsoleCwdToPanels := AValue;
 end;
 
 { ---- console commands ---------------------------------------------------- }
 
-procedure TTuiShell.ConsoleContentChanged(Sender: TObject);
+procedure THostShell.ConsoleContentChanged(Sender: TObject);
 begin
   Recompose;
 end;
 
-procedure TTuiShell.ConsoleCloseRequest(Sender: TObject);
+procedure THostShell.ConsoleCloseRequest(Sender: TObject);
 var
   ToFree: TConsoleWindow;
 begin
@@ -890,13 +858,13 @@ begin
   Recompose;
 end;
 
-procedure TTuiShell.ConsoleBackToPanels(Sender: TObject);
+procedure THostShell.ConsoleBackToPanels(Sender: TObject);
 begin
   ShowPanelMode;
   Recompose;
 end;
 
-procedure TTuiShell.ConsoleDismiss(Sender: TObject);
+procedure THostShell.ConsoleDismiss(Sender: TObject);
 begin
   if Assigned(FConsole) then
   begin
@@ -905,13 +873,13 @@ begin
   end;
 end;
 
-procedure TTuiShell.ConsoleFocusCommandLine(Sender: TObject);
+procedure THostShell.ConsoleFocusCommandLine(Sender: TObject);
 begin
   FDualPanel.FocusCommandLine;
   Recompose;
 end;
 
-procedure TTuiShell.ConsoleSyncDirToPanels(Sender: TObject);
+procedure THostShell.ConsoleSyncDirToPanels(Sender: TObject);
 var
   Cwd: string;
 begin
@@ -924,19 +892,19 @@ begin
   Recompose;
 end;
 
-function TTuiShell.ConsoleGetCmdHistory: TArray<string>;
+function THostShell.ConsoleGetCmdHistory: TArray<string>;
 begin
   Result := FDualPanel.GetCommandHistoryItems;
 end;
 
-procedure TTuiShell.ConsoleCommandExecuted(const ACommand: string);
+procedure THostShell.ConsoleCommandExecuted(const ACommand: string);
 begin
   FDualPanel.RecordConsoleCommand(ACommand);
 end;
 
 { ---- screen -------------------------------------------------------------- }
 
-function TTuiShell.Title: string;
+function THostShell.Title: string;
 var
   Path: string;
   I: Integer;
@@ -952,7 +920,7 @@ begin
       Delete(Result, I, 1);
 end;
 
-procedure TTuiShell.Resize(ACols, ARows: Integer);
+procedure THostShell.Resize(ACols, ARows: Integer);
 begin
   ACols := Max(ACols, 20);
   ARows := Max(ARows, 6);
@@ -964,7 +932,7 @@ begin
   FDirty := True;
 end;
 
-function TTuiShell.Compose: TTerminalGrid;
+function THostShell.Compose: TTerminalGrid;
 begin
   FMdi.LayoutMaximized(FCols, FRows);
   SyncHiddenConsoleArea(FCols, FRows);
@@ -977,60 +945,20 @@ end;
 
 { ---- input --------------------------------------------------------------- }
 
-procedure TTuiShell.SyncKeyModifiers(AShift: TShiftState);
-var
-  Changed: Boolean;
+procedure THostShell.SyncKeyModifiers(AShift: TShiftState);
 begin
-  Changed := False;
-  if Assigned(FDualPanel) and FDualPanel.Visible then
-    Changed := FDualPanel.SetKeyModifiers(AShift) or Changed;
-  if Assigned(FMdi.Active) and (FMdi.Active <> FDualPanel) then
-    Changed := FMdi.Active.SetKeyModifiers(AShift) or Changed;
-  if Changed then
+  if uKeyRouting.SyncKeyModifiers(FDualPanel, FMdi, AShift) then
     Recompose;
 end;
 
-function TTuiShell.IsConsoleScrollOrSelectionKey(AKey: Word; AKeyChar: Char;
+function THostShell.DispatchTerminalKey(var AKey: Word; var AKeyChar: Char;
   AShift: TShiftState): Boolean;
 begin
-  Result := (AKey = vkPrior) or (AKey = vkNext) or (AKey = vkHome) or (AKey = vkEnd) or
-    (AKey = vkUp) or (AKey = vkDown) or (AKey = vkLeft) or (AKey = vkRight) or
-    TKeyChord.Make(AKey, AKeyChar, AShift).MatchesLetter('C', [ssCtrl], [ssShift]) or
-    TKeyChord.Make(AKey, AKeyChar, AShift).MatchesLetter('A', [ssCtrl], [ssShift]);
-end;
-
-function TTuiShell.DispatchTerminalKey(var AKey: Word; var AKeyChar: Char;
-  AShift: TShiftState): Boolean;
-var
-  BareEscape: Boolean;
-begin
-  Result := False;
   SyncKeyModifiers(AShift);
-  // A dialog of the dual panel wins over the active window.
-  if FDualPanel.Visible and FDualPanel.DialogVisible and
-     FDualPanel.HandleInput(AKey, AShift, AKeyChar) then
-    Exit(True);
-  // Esc in console mode always restores the panels; the console clears its own
-  // selection first.
-  BareEscape := TKeyChord.Make(AKey, #0, AShift).Matches(vkEscape);
-  if BareEscape and FDualPanel.ConsoleMode and Assigned(FConsole) then
-  begin
-    FConsole.HandleInput(AKey, AShift, AKeyChar);
-    Exit(True);
-  end;
-  if IsConsoleActiveInConsoleMode and IsConsoleScrollOrSelectionKey(AKey, AKeyChar, AShift) and
-     FMdi.Active.HandleInput(AKey, AShift, AKeyChar) then
-    Exit(True);
-  if FDualPanel.Visible and FDualPanel.CmdFocused and not FDualPanel.ConsoleMode and
-     FDualPanel.HandleInput(AKey, AShift, AKeyChar) then
-    Exit(True);
-  if Assigned(FMdi.Active) and FMdi.Active.HandleInput(AKey, AShift, AKeyChar) then
-    Exit(True);
-  if FDualPanel.Visible and FDualPanel.HandleInput(AKey, AShift, AKeyChar) then
-    Exit(True);
+  Result := RouteTerminalKey(FDualPanel, FMdi, FConsole, AKey, AKeyChar, AShift);
 end;
 
-procedure TTuiShell.HandleKey(const AEvent: TTermEvent);
+procedure THostShell.HandleKey(const AEvent: TTermEvent);
 var
   Key: Word;
   Ch: Char;
@@ -1062,7 +990,7 @@ begin
   Recompose;
 end;
 
-procedure TTuiShell.HandlePaste(const AText: string);
+procedure THostShell.HandlePaste(const AText: string);
 var
   I: Integer;
   Key: Word;
@@ -1086,7 +1014,7 @@ begin
   Recompose;
 end;
 
-procedure TTuiShell.HandleMouseDown(const AEvent: TTermEvent);
+procedure THostShell.HandleMouseDown(const AEvent: TTermEvent);
 var
   Col, Row, LocalCol, LocalRow: Integer;
   Shift: TShiftState;
@@ -1179,7 +1107,7 @@ begin
   end;
 end;
 
-procedure TTuiShell.HandleMouseMove(const AEvent: TTermEvent);
+procedure THostShell.HandleMouseMove(const AEvent: TTermEvent);
 var
   Col, Row, LocalCol, LocalRow: Integer;
   Active: TTerminalWindow;
@@ -1206,7 +1134,7 @@ begin
     TConsoleWindow(Active).HandleMouseMove(LocalCol, LocalRow);
 end;
 
-procedure TTuiShell.HandleMouseUp(const AEvent: TTermEvent);
+procedure THostShell.HandleMouseUp(const AEvent: TTermEvent);
 var
   Col, Row: Integer;
   Btn: TWindowButton;
@@ -1229,7 +1157,7 @@ begin
     TConsoleWindow(FMdi.Active).HandleMouseUp;
 end;
 
-procedure TTuiShell.HandleWheel(const AEvent: TTermEvent);
+procedure THostShell.HandleWheel(const AEvent: TTermEvent);
 var
   Delta: Integer;
   K: Word;
@@ -1259,7 +1187,7 @@ begin
   end;
 end;
 
-procedure TTuiShell.HandleMouse(const AEvent: TTermEvent);
+procedure THostShell.HandleMouse(const AEvent: TTermEvent);
 begin
   case AEvent.MouseAction of
     tmaPress: HandleMouseDown(AEvent);
@@ -1271,7 +1199,7 @@ begin
   end;
 end;
 
-procedure TTuiShell.HandleEvent(const AEvent: TTermEvent);
+procedure THostShell.HandleEvent(const AEvent: TTermEvent);
 begin
   case AEvent.Kind of
     tekKey: HandleKey(AEvent);

@@ -849,6 +849,8 @@
     "toast.nothingToCopy": "Нечего копировать",
     "about.engine.skia": "Графический движок: Skia (монохромное сглаживание + затемнение диалогов)",
     "about.engine.gdi": "Графический движок: стандартный рендерер GDI/FMX",
+    "about.engine.tui": "Графический движок: текстовый терминал",
+    "about.engine.sdl": "Графический движок: SDL2 + FreeType",
     "update.failed": "Не удалось обновить MTN2.",
     "update.noWrite": "Нет прав на запись в папку программы.",
     "update.openPage": "Открыть страницу",

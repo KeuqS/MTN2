@@ -3482,7 +3482,7 @@ begin
     Prompt := 'Wrong password:'
   else
     Prompt := 'Password:';
-  ArchName := TPath.GetFileName(ArchiveBasePath(URI));
+  ArchName := SafeFileName(ArchiveBasePath(URI));
   if ArchName = '' then
     ArchName := ArchiveBasePath(URI);
   FDialogKind := hdkArchivePassword;
@@ -3519,7 +3519,7 @@ begin
     FArchivePasswordRetry := False;
     if ArchPath <> '' then
     begin
-      FPendingSelectName := TPath.GetFileName(ArchPath);
+      FPendingSelectName := SafeFileName(ArchPath);
       FPendingSelectSide := FArchivePasswordSide;
     end;
     Parent := ArchiveBaseDirUri(FArchivePasswordUri);
@@ -3643,7 +3643,7 @@ begin
     Prompt := 'Wrong password:'
   else
     Prompt := 'Password:';
-  ArchName := TPath.GetFileName(FArchiveActionPath);
+  ArchName := SafeFileName(FArchiveActionPath);
   FDialogKind := hdkArchivePassword;
   FDialog.Open(BuildArchivePasswordDialog(ArchName, Prompt), DialogCommand);
   NotifyChanged;
@@ -4138,7 +4138,7 @@ begin
       Exit;
     if ArchPath <> '' then
     begin
-      FPendingSelectName := TPath.GetFileName(ArchPath);
+      FPendingSelectName := SafeFileName(ArchPath);
       FPendingSelectSide := Side;
     end;
     NavigateActiveTo(ArchDirURI);
@@ -4624,7 +4624,7 @@ begin
   URI := ActiveTab(ActivePanel(Ws)).CurrentURI;
   Result := FileUriToPath(URI);
   if HasArchiveChain(URI) then
-    Result := TPath.GetDirectoryName(ArchiveBasePath(URI))
+    Result := SafeDirectoryName(ArchiveBasePath(URI))
   else if IsFindUri(URI) then
   begin
     if TryGetFindSessionFromUri(URI, FindData) then
@@ -4775,7 +4775,7 @@ begin
     Cmd := '"' + Path + '"'
   else
     Cmd := Path;
-  Cwd := TPath.GetDirectoryName(Path);
+  Cwd := SafeDirectoryName(Path);
   if not ShellRunDetached(Cmd, Cwd) then
     OpenStub(skShellInfo, 'Run failed', Path)
   else
@@ -7211,7 +7211,7 @@ begin
   except
     // a folder still in use by the program it was opened in stays
   end;
-  LeafName := TPath.GetFileName(StringReplace(AName, '/', PathDelim, [rfReplaceAll]));
+  LeafName := SafeFileName(StringReplace(AName, '/', PathDelim, [rfReplaceAll]));
   if LeafName = '' then
     Exit;
   Dir := TPath.Combine(Root, TGUID.NewGuid.ToString.Trim(['{', '}']));

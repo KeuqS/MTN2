@@ -720,7 +720,7 @@ function TVfsRegistry.TryResolveArchive(const AFileName: string;
   begin
     AKind := akZipChain;
     AScheme := '';
-    Ext := LowerCase(TPath.GetExtension(AFileName));
+    Ext := LowerCase(SafeExtension(AFileName));
     if Ext = '' then
       Exit(False);
     for I := 0 to FArchiveExts.Count - 1 do

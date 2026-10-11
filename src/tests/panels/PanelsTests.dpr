@@ -53,7 +53,9 @@ uses
   TestStubController in 'TestStubController.pas',
   TestTopMenuBar in 'TestTopMenuBar.pas',
   TestPicturePreview in 'TestPicturePreview.pas',
-  TestTuiShell in 'TestTuiShell.pas',
+  TestHostShell in 'TestHostShell.pas',
+  TestKeyRouting in 'TestKeyRouting.pas',
+  TestThemeController in 'TestThemeController.pas',
   TestUserMenuController in 'TestUserMenuController.pas';
 
 begin

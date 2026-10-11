@@ -28,6 +28,7 @@ uses
   TestStrings in 'TestStrings.pas',
   TestConsoleLaunch in 'TestConsoleLaunch.pas',
   TestTerminalRenderer in 'TestTerminalRenderer.pas',
+  TestSafePath in 'TestSafePath.pas',
   TestTermInput in 'TestTermInput.pas',
   TestThemeSpec in 'TestThemeSpec.pas',
   TestToast in 'TestToast.pas',

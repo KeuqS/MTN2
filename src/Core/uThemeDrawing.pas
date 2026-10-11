@@ -9,7 +9,7 @@ unit uThemeDrawing;
 interface
 
 uses
-  System.UITypes, System.Math,
+  System.SysUtils, System.UITypes, System.Math,
   uTerminalTypes, uThemeTypes, uDisplaySettings, uCharWidth;
 
 var
@@ -25,6 +25,16 @@ var
   /// session.json (passiveCursor). Off: the cursor row of the panel that does
   /// not have the focus is drawn as an ordinary row.</summary>
   GShowPassiveCursor: Boolean = True;
+  /// <summary>How much the modal backdrop darkens the scene, in percent. The
+  /// host sets it for its renderer: smooth glyph edges read well under a
+  /// stronger dim than blocky ones.</summary>
+  GModalDimPercent: Byte = 72;
+  /// <summary>Darkness of a drop shadow strip (0..255) in the classic style;
+  /// the host sets it for its renderer.</summary>
+  GShadowCover: Byte = 200;
+  /// <summary>Gives the text of the "Graphics engine" line of the About
+  /// dialog; set by the host. Not set: the line is left out of the text.</summary>
+  GGraphicsEngineLabel: TFunc<string> = nil;
 
 /// <summary>IThemeRenderer.ResolveFileRowColors, with a marked row away
 /// from the cursor taking the theme's band under mrsBand.</summary>
@@ -214,15 +224,6 @@ begin
 end;
 
 const
-  // Single shadow strength shared by DrawDialogShadow and DrawButtonShadow:
-  // a second, lighter tone plus Skia's own glyph-edge antialiasing would
-  // read as a shadow cast on top of a shadow. Stronger under Skia where
-  // subpixel AA makes a softer strip read better than flat gray replacement.
-  {$IFDEF SKIA}
-  cShadowCover = 168;
-  {$ELSE}
-  cShadowCover = 200;
-  {$ENDIF}
   // "Soft": still reads as depth on light and dark palettes, without the
   // 1992 slab.
   cSoftShadowCover = 80;
@@ -246,7 +247,7 @@ begin
     ssSoft: Result := cSoftShadowCover;
     ssNone: Result := 0;
   else
-    Result := cShadowCover;
+    Result := GShadowCover;
   end;
 end;
 
@@ -338,7 +339,7 @@ begin
   Cover := ShadowCoverFor(GShadowStyle);
   if (Cover = 0) or (ABounds.Width < 1) or (ABounds.Height < 1) then
     Exit;
-  // Half-block glyph (▄/▀), single darkened tone (cShadowCover, same one
+  // Half-block glyph (▄/▀), single darkened tone (GShadowCover, same one
   // DrawDialogShadow uses) - the glyph's own half of the cell is the shadow;
   // the other half keeps the panel color under it exactly as-is (not a
   // second, lighter darken pass), so there's one shadow edge, not two.

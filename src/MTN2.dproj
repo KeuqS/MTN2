@@ -241,6 +241,7 @@
         <DCCReference Include="Core\uEditorDialogs.pas"/>
         <DCCReference Include="Core\uEditorInput.pas"/>
         <DCCReference Include="Core\uKeyChord.pas"/>
+        <DCCReference Include="Core\uKeyRouting.pas"/>
         <DCCReference Include="Core\uVfsUtils.pas"/>
         <DCCReference Include="Core\uDialogRenderer.pas"/>
         <DCCReference Include="Core\uDualPanelCmdLine.pas"/>
@@ -341,11 +342,13 @@
         <DCCReference Include="Core\uThemeNames.pas"/>
         <DCCReference Include="Core\uDataTheme.pas"/>
         <DCCReference Include="Core\uThemeRegistry.pas"/>
+        <DCCReference Include="Core\uThemeController.pas"/>
         <DCCReference Include="Core\uThemeProxy.pas"/>
         <DCCReference Include="Core\uTerminalRenderer.pas"/>
         <DCCReference Include="Core\uFileClip.pas"/>
         <DCCReference Include="Core\uCoreTimer.pas"/>
         <DCCReference Include="Hosts\Fmx\uFmxTimer.pas"/>
+        <DCCReference Include="Hosts\Fmx\uFmxRenderProfile.pas"/>
         <DCCReference Include="Platform\Windows\uWinFileDragDrop.pas"/>
         <DCCReference Include="Core\uWinFileAttr.pas"/>
         <DCCReference Include="Platform\Windows\uSingleInstance.pas"/>

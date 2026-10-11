@@ -59,6 +59,7 @@ uses
   uEditorDialogs in 'Core\uEditorDialogs.pas',
   uEditorInput in 'Core\uEditorInput.pas',
   uKeyChord in 'Core\uKeyChord.pas',
+  uKeyRouting in 'Core\uKeyRouting.pas',
   uVfsUtils in 'Core\uVfsUtils.pas',
   uDialogRenderer in 'Core\uDialogRenderer.pas',
   uDualPanelCmdLine in 'Core\uDualPanelCmdLine.pas',
@@ -158,11 +159,13 @@ uses
   uThemeNames in 'Core\uThemeNames.pas',
   uDataTheme in 'Core\uDataTheme.pas',
   uThemeRegistry in 'Core\uThemeRegistry.pas',
+  uThemeController in 'Core\uThemeController.pas',
   uThemeProxy in 'Core\uThemeProxy.pas',
   uTerminalRenderer in 'Core\uTerminalRenderer.pas',
   uFileClip in 'Core\uFileClip.pas',
   uCoreTimer in 'Core\uCoreTimer.pas',
   uFmxTimer in 'Hosts\Fmx\uFmxTimer.pas',
+  uFmxRenderProfile in 'Hosts\Fmx\uFmxRenderProfile.pas',
   uWinFileDragDrop in 'Platform\Windows\uWinFileDragDrop.pas',
   uWinFileAttr in 'Core\uWinFileAttr.pas',
   uSingleInstance in 'Platform\Windows\uSingleInstance.pas',
@@ -220,6 +223,7 @@ begin
   {$IFDEF SKIA}
   GlobalUseSkia := not NoSkiaRequested;
   {$ENDIF}
+  InstallFmxRenderProfile;
   Application.Initialize;
   // The taskbar button shows this until the main window gets its own caption.
   Application.Title := 'Modern Terminal Navigator 2';

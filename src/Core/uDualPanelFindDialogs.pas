@@ -83,7 +83,7 @@ var
   FindData: TFindSessionData;
 begin
   if HasArchiveChain(ACurrentUri) then
-    Result := TPath.GetDirectoryName(ArchiveBasePath(ACurrentUri))
+    Result := SafeDirectoryName(ArchiveBasePath(ACurrentUri))
   else if IsFindUri(ACurrentUri) then
   begin
     if TryGetFindSessionFromUri(ACurrentUri, FindData) then

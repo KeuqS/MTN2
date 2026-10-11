@@ -16,6 +16,15 @@ function PlatformFontInstalled(const AName: string): Boolean;
 /// <summary>Names of the installed monospace families.</summary>
 function PlatformMonoFonts: TArray<string>;
 
+/// <summary>Path of the font file that serves a family in a style; '' when
+/// none is found. The closest installed style is returned when the exact one
+/// is missing.</summary>
+function PlatformFontFile(const AFamily: string; ABold, AItalic: Boolean): string;
+
+/// <summary>Path of a font file that has a glyph for the code point (CJK,
+/// symbols); '' when none is found.</summary>
+function PlatformFontFileForChar(ACodePoint: Integer): string;
+
 implementation
 
 uses
@@ -105,6 +114,38 @@ end;
 function PlatformMonoFonts: TArray<string>;
 begin
   Result := FamiliesOf(':spacing=mono');
+end;
+
+function MatchedFile(const APattern: string): string;
+var
+  Lines: TStringList;
+begin
+  Lines := TStringList.Create;
+  try
+    Lines.Text := RunCapture('fc-match -f ''%{file}\n'' ''' + APattern + ''' 2>/dev/null');
+    Result := '';
+    if Lines.Count > 0 then
+      Result := Trim(Lines[0]);
+  finally
+    Lines.Free;
+  end;
+end;
+
+function PlatformFontFile(const AFamily: string; ABold, AItalic: Boolean): string;
+var
+  Pattern: string;
+begin
+  Pattern := StringReplace(Trim(AFamily), '''', '', [rfReplaceAll]);
+  if ABold then
+    Pattern := Pattern + ':weight=bold';
+  if AItalic then
+    Pattern := Pattern + ':slant=italic';
+  Result := MatchedFile(Pattern);
+end;
+
+function PlatformFontFileForChar(ACodePoint: Integer): string;
+begin
+  Result := MatchedFile(':charset=' + IntToHex(ACodePoint, 1));
 end;
 
 end.

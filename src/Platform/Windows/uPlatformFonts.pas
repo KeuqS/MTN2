@@ -16,6 +16,15 @@ function PlatformFontInstalled(const AName: string): Boolean;
 /// <summary>Face names of the installed fixed-pitch families.</summary>
 function PlatformMonoFonts: TArray<string>;
 
+/// <summary>Path of the font file that serves a family in a style; '' when
+/// none is found. The closest installed style is returned when the exact one
+/// is missing.</summary>
+function PlatformFontFile(const AFamily: string; ABold, AItalic: Boolean): string;
+
+/// <summary>Path of a font file that has a glyph for the code point (CJK,
+/// symbols); '' when none is found.</summary>
+function PlatformFontFileForChar(ACodePoint: Integer): string;
+
 implementation
 
 uses
@@ -114,6 +123,46 @@ begin
   finally
     List.Free;
   end;
+end;
+
+function FirstExistingFont(const ANames: array of string): string;
+var
+  Dir, Name: string;
+begin
+  Dir := GetEnvironmentVariable('WINDIR');
+  if Dir = '' then
+    Dir := 'C:\Windows';
+  Dir := TPath.Combine(Dir, 'Fonts');
+  for Name in ANames do
+    if TFile.Exists(TPath.Combine(Dir, Name)) then
+      Exit(TPath.Combine(Dir, Name));
+  Result := '';
+end;
+
+function PlatformFontFile(const AFamily: string; ABold, AItalic: Boolean): string;
+begin
+  if SameText(Trim(AFamily), 'Cascadia Mono') then
+  begin
+    Result := FirstExistingFont(['CascadiaMono.ttf']);
+    if Result <> '' then
+      Exit;
+  end;
+  if ABold and AItalic then
+    Result := FirstExistingFont(['consolaz.ttf', 'courbi.ttf'])
+  else if ABold then
+    Result := FirstExistingFont(['consolab.ttf', 'courbd.ttf'])
+  else if AItalic then
+    Result := FirstExistingFont(['consolai.ttf', 'couri.ttf'])
+  else
+    Result := FirstExistingFont(['consola.ttf', 'cour.ttf', 'lucon.ttf']);
+end;
+
+function PlatformFontFileForChar(ACodePoint: Integer): string;
+begin
+  if ACodePoint >= $2E80 then
+    Result := FirstExistingFont(['msgothic.ttc', 'simsun.ttc', 'malgun.ttf'])
+  else
+    Result := FirstExistingFont(['seguisym.ttf', 'arial.ttf']);
 end;
 
 end.

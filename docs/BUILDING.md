@@ -39,6 +39,7 @@
 
 ```powershell
 ./src/build-linux.ps1                 # -> bin\linux64\mtn2-tui + plugins\<id>\lib*.so
+./src/build-linux.ps1 -Sdl            # дополнительно bin\linux64\mtn2-sdl (окно SDL2, см. LINUX.md)
 ./src/build-linux.ps1 -NoPlugins      # только программа, без плагинов (.so) и libwasmtime.so
 ./src/build-linux.ps1 -Dump           # собрать и нарисовать один экран текстом в WSL
 ./src/tests/run-tests-linux.ps1       # те же тестовые группы, собранные под Linux64 и запущенные в WSL
@@ -46,7 +47,7 @@
 
 Платформенный код лежит в парах юнитов с одним именем: `src/Platform/Windows` и `src/Platform/Posix`;
 проект берёт одну из папок через путь поиска юнитов, `{$IFDEF}` в общем коде не нужен. Общий код –
-`src/Core`, терминальный хост – `src/Hosts/Ansi`, оконный (FireMonkey) – `src/Hosts/Fmx` и `src/Forms`.
+`src/Core`, общий контроллер хостов – `src/Hosts/Common`, терминальный хост – `src/Hosts/Ansi`, хост с окном SDL2 – `src/Hosts/Sdl`, оконный (FireMonkey) – `src/Hosts/Fmx` и `src/Forms`.
 `src/tools/check-platform.ps1` падает, если юнит в `Core` или `Forms` обращается к платформенному API
 напрямую (список исключений – `platform-baseline.txt`, он может только сокращаться).
 

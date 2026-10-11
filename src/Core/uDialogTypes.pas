@@ -397,11 +397,8 @@ function BuildKeymapEditDialog(const AActionName, AKeysText,
 implementation
 
 uses
-  uDialogResources, uFileAttrTypes, uDialogLocaleLayout, uDisplaySettings, uConsoleSettings, uStrings, uUpdater
-  {$IFDEF SKIA}
-  , FMX.Skia
-  {$ENDIF}
-  ;
+  uDialogResources, uFileAttrTypes, uDialogLocaleLayout, uDisplaySettings, uConsoleSettings, uStrings, uUpdater,
+  uThemeDrawing;
 
 procedure ClearControlLayout(var C: TDialogControl);
 begin
@@ -1812,15 +1809,10 @@ var
 begin
   RequireDialogResource(cResDialogAbout, Result);
 
-  // --no-skia wins even if GlobalUseSkia was already captured by the canvas.
-  {$IFDEF SKIA}
-  if GlobalUseSkia and not NoSkiaRequested then
-    Engine := T('ui.about.engine.skia', 'Graphics Engine: Skia (mono AA + modal dim)')
+  if Assigned(GGraphicsEngineLabel) then
+    Engine := GGraphicsEngineLabel()
   else
-    Engine := T('ui.about.engine.gdi', 'Graphics Engine: Standard GDI/FMX Renderer');
-  {$ELSE}
-  Engine := T('ui.about.engine.gdi', 'Graphics Engine: Standard GDI/FMX Renderer');
-  {$ENDIF}
+    Engine := '';
   DialogSetLabelText(Result, 'lbl_skia', Engine);
 
   Ver := AppVersionString;

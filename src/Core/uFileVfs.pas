@@ -402,7 +402,7 @@ begin
         // instead of resetting to a near-zero per-file value on every new
         // child (see CopyTree callers below). AItemDone/AItemTotal/paths carry
         // this file's own progress separately, for the per-file bar.
-        QueueProgress(AOnProgress, ABaseDoneBytes + Copied, ReportTotal, TPath.GetFileName(ASrc),
+        QueueProgress(AOnProgress, ABaseDoneBytes + Copied, ReportTotal, SafeFileName(ASrc),
           Copied, Total, ASrc, ADst);
       end;
     except
@@ -705,7 +705,7 @@ begin
         begin
           Inc(ADoneItems);
           QueueProgress(AOnProgress, ADoneItems, ATotalItems,
-            TPath.GetFileName(Path), 0, 0, Path, '');
+            SafeFileName(Path), 0, 0, Path, '');
         end;
       end;
     end
@@ -717,7 +717,7 @@ begin
       begin
         Inc(ADoneItems);
         QueueProgress(AOnProgress, ADoneItems, ATotalItems,
-          TPath.GetFileName(Path), 0, 0, Path, '');
+          SafeFileName(Path), 0, 0, Path, '');
       end;
     end
     else
@@ -803,7 +803,7 @@ begin
                   if (SR.Name <> '.') and (SR.Name <> '..') then
                   begin
                     Entry.Name := SR.Name;
-                    Entry.Extension := LowerCase(TPath.GetExtension(SR.Name));
+                    Entry.Extension := LowerCase(SafeExtension(SR.Name));
                     Entry.IsDirectory := (SR.Attr and faDirectory) <> 0;
                     PlatformFillEntry(SR, Entry);
                     Entry.TargetURI := '';
@@ -951,8 +951,8 @@ begin
           else
           begin
             // Create under the resolved parent when the panel URI is a junction.
-            Parent := TPath.GetDirectoryName(Path);
-            Leaf := TPath.GetFileName(Path);
+            Parent := SafeDirectoryName(Path);
+            Leaf := SafeFileName(Path);
             if (Parent <> '') and (Leaf <> '') then
             begin
               Parent := ResolveLocalDirPath(Parent);
@@ -1039,7 +1039,7 @@ begin
               begin
                 CopyFileWithProgress(Src, Dst, Cancel, OnProgress, Err, Overwrite, Preserve);
                 if Err.Code = vecOk then
-                  QueueProgress(OnProgress, TotalBytes, TotalBytes, TPath.GetFileName(Src),
+                  QueueProgress(OnProgress, TotalBytes, TotalBytes, SafeFileName(Src),
                     TotalBytes, TotalBytes, Src, Dst);
               end;
               if Err.Code = vecOk then
@@ -1140,13 +1140,13 @@ begin
               (UpCase(Src[1]) = UpCase(Dst[1])) and (Src[2] = ':') and (Dst[2] = ':');
             if SameVolume then
             begin
-              QueueProgress(OnProgress, 0, 1, TPath.GetFileName(Src), 0, 1, Src, Dst);
+              QueueProgress(OnProgress, 0, 1, SafeFileName(Src), 0, 1, Src, Dst);
               try
                 if WasDirectory then
                   TDirectory.Move(WinApiPath(Src), WinApiPath(Dst))
                 else
                   TFile.Move(WinApiPath(Src), WinApiPath(Dst));
-                QueueProgress(OnProgress, 1, 1, TPath.GetFileName(Dst), 1, 1, Src, Dst);
+                QueueProgress(OnProgress, 1, 1, SafeFileName(Dst), 1, 1, Src, Dst);
               except
                 on E: Exception do
                   Err := VfsErrorFromException(E, FromURI);

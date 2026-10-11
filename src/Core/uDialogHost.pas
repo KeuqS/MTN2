@@ -2175,11 +2175,7 @@ begin
     Exit;
   LayoutIn(AAreaW, AAreaH);
   // FAR-style modal dim: darken the already-painted scene, then paint chrome.
-  {$IFDEF SKIA}
-  DimGridExcept(AGrid, FBounds, 88);
-  {$ELSE}
-  DimGridExcept(AGrid, FBounds, 72);
-  {$ENDIF}
+  DimGridExcept(AGrid, FBounds, GModalDimPercent);
   if FDecl.IsWarning then
     DrawWarningDialogFrame(AGrid, FBounds, FDecl.Title)
   else if Assigned(FTheme) then

@@ -287,7 +287,7 @@ var
   DT: TDateTime;
 begin
   Result.Name := AName;
-  Result.Extension := LowerCase(TPath.GetExtension(AName));
+  Result.Extension := LowerCase(SafeExtension(AName));
   Result.IsDirectory := False;
   Result.IsHidden := False;
   Result.IsReadOnly := False;
@@ -1278,7 +1278,7 @@ begin
       begin
         H := AZip.FileInfo[I];
         E.Name := Rest;
-        E.Extension := LowerCase(TPath.GetExtension(Rest));
+        E.Extension := LowerCase(SafeExtension(Rest));
         E.IsDirectory := False;
         E.IsHidden := False;
         E.IsReadOnly := False;
@@ -1448,7 +1448,7 @@ begin
       AZip.Open(AZipPath, zmReadWrite)
     else
     begin
-      ForceDirectories(TPath.GetDirectoryName(AZipPath));
+      ForceDirectories(SafeDirectoryName(AZipPath));
       AZip.Open(AZipPath, zmWrite);
     end;
     Result := True;
@@ -1570,11 +1570,11 @@ begin
   begin
     if ATotal <= 0 then
       ATotal := 1;
-    QueueProgress(AOnProgress, ADone, ATotal, TPath.GetFileName(ALocalPath));
+    QueueProgress(AOnProgress, ADone, ATotal, SafeFileName(ALocalPath));
     AddLocalFileToZip(AZip, ALocalPath, Pref, AOverwrite, AError);
     if AError.Code = vecOk then
       Inc(ADone);
-    QueueProgress(AOnProgress, ADone, ATotal, TPath.GetFileName(ALocalPath));
+    QueueProgress(AOnProgress, ADone, ATotal, SafeFileName(ALocalPath));
     Exit;
   end;
   if not TDirectory.Exists(ALocalPath) then
@@ -1771,7 +1771,7 @@ var
   Got: Integer;
   LH: TZipHeader;
 begin
-  ForceDirectories(TPath.GetDirectoryName(ADestPath));
+  ForceDirectories(SafeDirectoryName(ADestPath));
   AZip.Read(AIndex, Local, LH);
   try
     OutFS := TFileStream.Create(ADestPath, fmCreate);
@@ -1908,7 +1908,7 @@ begin
             if LocalSrc = '' then
               Err := TVfsError.Make(vecInvalidURI, 'Invalid source', FromURI)
             else if Length(Segs) = 0 then
-              EntryName := TPath.GetFileName(ExcludeTrailingPathDelimiter(LocalSrc))
+              EntryName := SafeFileName(ExcludeTrailingPathDelimiter(LocalSrc))
             else
               EntryName := Segs[0];
             if OpenZipForWrite(Path, Zip, Err) then
@@ -1960,13 +1960,13 @@ begin
                         Break;
                       end;
                       Pair := Jobs[I];
-                      QueueProgress(OnProgress, Done, Total, TPath.GetFileName(Pair.Value));
+                      QueueProgress(OnProgress, Done, Total, SafeFileName(Pair.Value));
                       ExtractEntryToFile(Stack[High(Stack)].Zip, Pair.Key, Pair.Value,
                         Cancel, Err);
                       if Err.Code <> vecOk then
                         Break;
                       Inc(Done, Stack[High(Stack)].Zip.FileInfo[Pair.Key].UncompressedSize);
-                      QueueProgress(OnProgress, Done, Total, TPath.GetFileName(Pair.Value));
+                      QueueProgress(OnProgress, Done, Total, SafeFileName(Pair.Value));
                     end;
                   end;
                 end;

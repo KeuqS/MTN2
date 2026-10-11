@@ -39,7 +39,7 @@ begin
   if TDirectory.Exists(ADir) then
     // Every file is looked at: a name pattern is case-sensitive on Linux.
     for Found in TDirectory.GetFiles(ADir) do
-      if SameText(TPath.GetFileName(Found), cFileName) then
+      if SameText(ExtractFileName(Found), cFileName) then
         Exit(Found);
 end;
 
