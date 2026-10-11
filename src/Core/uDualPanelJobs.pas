@@ -12,6 +12,17 @@ uses
   uStrings, uElevation, uFileRecycleBin;
 
 type
+  /// <summary>Liveness flag shared by the controller and the closures it
+  /// queues or hands to worker threads. Those closures can run after the
+  /// controller is freed, so they test this flag (kept alive by the closure)
+  /// before touching any controller field.</summary>
+  IJobLife = interface
+    ['{6B1F4C0E-3D52-4B7A-9E8A-2C5D7A41F0B3}']
+    function GetAlive: Boolean;
+    procedure SetAlive(AValue: Boolean);
+    property Alive: Boolean read GetAlive write SetAlive;
+  end;
+
   TJobConfirmDialogEvent = reference to procedure(const ATitle, AMessage: string);
   TJobOverwriteAskEvent = reference to procedure(const APath, ANewLine, AExistingLine: string);
   TJobDeleteAskEvent = reference to procedure(const APath, AHeadline, AQuestion,
@@ -43,7 +54,7 @@ type
     FOnAfterClose: TProc;
     FOnBeforeExecute: TProc;
     FJob: TPanelJobState;
-    FAlive: Boolean;
+    FLife: IJobLife;
     FLastProgressInvalidateTick: UInt64;
     FProgressInvalidateQueued: Boolean;
     FProgressInvalidateDirty: Boolean;
@@ -68,7 +79,8 @@ type
     function ActiveVfs: IVirtualFileSystem;
     procedure RunElevatedRemainder(AFromIndex: Integer);
     procedure ProbeJobItemAsync(const ASrcURI, ADstURI: string; AIndex: Integer;
-      AKind: TPanelJobKind; AFollowSymlinks, AOnlyNewer, AOverwriteAsk: Boolean);
+      AKind: TPanelJobKind; AFollowSymlinks, AOnlyNewer, AOverwriteAsk: Boolean;
+      const ALife: IJobLife);
     function ProbeSkipReparse(AKind: TPanelJobKind; AFollowSymlinks: Boolean;
       const ASrcURI, ASrcPath: string): Boolean;
     function ProbeSkipNewer(AOnlyNewer, ASkipReparse: Boolean;
@@ -171,6 +183,24 @@ type
 
 implementation
 
+type
+  TJobLife = class(TInterfacedObject, IJobLife)
+  private
+    FAlive: Boolean;
+    function GetAlive: Boolean;
+    procedure SetAlive(AValue: Boolean);
+  end;
+
+function TJobLife.GetAlive: Boolean;
+begin
+  Result := FAlive;
+end;
+
+procedure TJobLife.SetAlive(AValue: Boolean);
+begin
+  FAlive := AValue;
+end;
+
 function JobErrorDisplayPath(const AError: TVfsError; const AFallbackURI: string): string;
 var
   FailedURI: string;
@@ -212,7 +242,8 @@ begin
   FOnClearSelection := AOnClearSelection;
   FOnAfterClose := AOnAfterClose;
   FOnBeforeExecute := AOnBeforeExecute;
-  FAlive := True;
+  FLife := TJobLife.Create;
+  FLife.Alive := True;
   FLastProgressInvalidateTick := 0;
   FProgressInvalidateQueued := False;
   FProgressInvalidateDirty := False;
@@ -234,7 +265,7 @@ end;
 
 destructor TPanelJobController.Destroy;
 begin
-  FAlive := False;
+  FLife.Alive := False;
   if Assigned(FJob.Cancel) then
     FJob.Cancel.Cancel;
   inherited;
@@ -819,7 +850,9 @@ procedure TPanelJobController.StartJobExecution;
 var
   CapSources: TArray<string>;
   CountFolders: Boolean;
+  Life: IJobLife;
 begin
+  Life := FLife;
   if Assigned(FOnBeforeExecute) then
     FOnBeforeExecute;
   FJob.Cancel := TJobCancelToken.Create;
@@ -863,7 +896,7 @@ begin
         TThread.Queue(nil,
           procedure
           begin
-            if not FAlive or (FJob.Phase <> pjpRunning) then
+            if not Life.Alive or (FJob.Phase <> pjpRunning) then
               Exit;
             if not CountFolders and (Total > FJob.BytesTotal) then
               FJob.BytesTotal := Total;
@@ -879,7 +912,7 @@ begin
   TThread.ForceQueue(nil,
     procedure
     begin
-      if not FAlive then
+      if not Life.Alive then
         Exit;
       if FJob.Phase <> pjpRunning then
         Exit;
@@ -890,7 +923,10 @@ end;
 procedure TPanelJobController.NotifyProgressUi;
 const
   cMinInvalidateMs = 50; // ~20 Hz full Recompose while a transfer runs
+var
+  Life: IJobLife;
 begin
+  Life := FLife;
   FProgressInvalidateDirty := True;
   if (PlatformTickCount64 - FLastProgressInvalidateTick) >= cMinInvalidateMs then
   begin
@@ -906,8 +942,10 @@ begin
   TThread.ForceQueue(nil,
     procedure
     begin
+      if not Life.Alive then
+        Exit;
       FProgressInvalidateQueued := False;
-      if not FAlive or not FProgressInvalidateDirty then
+      if not FProgressInvalidateDirty then
         Exit;
       if FJob.Phase <> pjpRunning then
         Exit;
@@ -995,7 +1033,7 @@ procedure TPanelJobController.ContinueJobItemAfterProbe(const ASrcURI, ADstURI: 
 var
   IsDirMerge: Boolean;
 begin
-  if not FAlive then
+  if not FLife.Alive then
     Exit;
   if FJob.Phase <> pjpRunning then
     Exit;
@@ -1029,8 +1067,9 @@ var
   CapIdx: Integer;
   CapKind: TPanelJobKind;
   CapFollow, CapOnlyNewer, CapOverwriteAsk: Boolean;
+  Life: IJobLife;
 begin
-  if not FAlive then
+  if not FLife.Alive then
     Exit;
   if FJob.Phase <> pjpRunning then
     Exit;
@@ -1115,11 +1154,14 @@ begin
   CapFollow := FJob.FollowSymlinks;
   CapOnlyNewer := FJob.OnlyNewer;
   CapOverwriteAsk := (FJob.OverwriteMode = jomAsk) and not FJob.HasRememberedAction;
+  Life := FLife;
   TThread.CreateAnonymousThread(
     procedure
     begin
+      if not Life.Alive then
+        Exit;
       ProbeJobItemAsync(CapSrc, CapDst, CapIdx, CapKind, CapFollow, CapOnlyNewer,
-        CapOverwriteAsk);
+        CapOverwriteAsk, Life);
     end).Start;
 end;
 
@@ -1164,7 +1206,7 @@ end;
 
 procedure TPanelJobController.ProbeJobItemAsync(const ASrcURI, ADstURI: string;
   AIndex: Integer; AKind: TPanelJobKind; AFollowSymlinks, AOnlyNewer,
-  AOverwriteAsk: Boolean);
+  AOverwriteAsk: Boolean; const ALife: IJobLife);
 var
   SkipReparse, SkipNewer, DestExists, BothDirs: Boolean;
   SrcPath, DstPath, NewLine, ExistingLine: string;
@@ -1193,6 +1235,8 @@ begin
   TThread.Queue(nil,
     procedure
     begin
+      if not ALife.Alive then
+        Exit;
       ContinueJobItemAfterProbe(ASrcURI, ADstURI, AIndex, AKind,
         SkipReparse, SkipNewer, DestExists, BothDirs, NewLine, ExistingLine);
     end);
@@ -1373,7 +1417,9 @@ var
   Cancel: IJobCancelToken;
   SrcURI: string;
   Idx: Integer;
+  Life: IJobLife;
 begin
+  Life := FLife;
   SrcURI := ASrcURI;
   Idx := AIndex;
   Cancel := FJob.Cancel;
@@ -1386,14 +1432,14 @@ begin
     procedure(const ADone, ATotal: Int64; const ACurrentName: string;
       const AItemDone, AItemTotal: Int64; const AItemSrcPath, AItemDstPath: string)
     begin
-      if not FAlive or (FJob.Phase <> pjpRunning) then
+      if not Life.Alive or (FJob.Phase <> pjpRunning) then
         Exit;
       NoteItemProgress(ADone, ATotal, ACurrentName, AItemDone, AItemTotal,
         AItemSrcPath, AItemDstPath);
     end,
     procedure(const ASuccess: Boolean; const AError: TVfsError)
     begin
-      if not FAlive then
+      if not Life.Alive then
         Exit;
       if FJob.Phase <> pjpRunning then
       begin
@@ -1643,7 +1689,9 @@ var
   SrcURI, DstURI, SrcPath, DstPath: string;
   Idx: Integer;
   DoOverwrite: Boolean;
+  Life: IJobLife;
 begin
+  Life := FLife;
   Kind := FJob.Kind;
   Cancel := FJob.Cancel;
   SrcURI := ASrcURI;
@@ -1684,14 +1732,14 @@ begin
       procedure(const ADone, ATotal: Int64; const ACurrentName: string;
         const AItemDone, AItemTotal: Int64; const AItemSrcPath, AItemDstPath: string)
       begin
-        if not FAlive or (FJob.Phase <> pjpRunning) then
+        if not Life.Alive or (FJob.Phase <> pjpRunning) then
           Exit;
         NoteItemProgress(ADone, ATotal, ACurrentName, AItemDone, AItemTotal,
           AItemSrcPath, AItemDstPath);
       end,
       procedure(const ASuccess: Boolean; const AError: TVfsError)
       begin
-        if not FAlive then
+        if not Life.Alive then
           Exit;
         if FJob.Phase <> pjpRunning then
           Exit;
@@ -1707,14 +1755,14 @@ begin
       procedure(const ADone, ATotal: Int64; const ACurrentName: string;
         const AItemDone, AItemTotal: Int64; const AItemSrcPath, AItemDstPath: string)
       begin
-        if not FAlive or (FJob.Phase <> pjpRunning) then
+        if not Life.Alive or (FJob.Phase <> pjpRunning) then
           Exit;
         NoteItemProgress(ADone, ATotal, ACurrentName, AItemDone, AItemTotal,
           AItemSrcPath, AItemDstPath);
       end,
       procedure(const ASuccess: Boolean; const AError: TVfsError)
       begin
-        if not FAlive then
+        if not Life.Alive then
           Exit;
         if FJob.Phase <> pjpRunning then
           Exit;
@@ -1731,7 +1779,10 @@ end;
 // a single background thread streams bytes instead of going through the VFS.
 procedure TPanelJobController.RunAppendCopyThread(const ASrcURI, ADstURI, ASrcPath,
   ADstPath: string; AIndex: Integer; const ACancel: IJobCancelToken);
+var
+  Life: IJobLife;
 begin
+  Life := FLife;
   TThread.CreateAnonymousThread(
     procedure
     var
@@ -1776,7 +1827,7 @@ begin
             TThread.Queue(nil,
               procedure
               begin
-                if not FAlive or (FJob.Phase <> pjpRunning) then
+                if not Life.Alive or (FJob.Phase <> pjpRunning) then
                   Exit;
                 NoteItemProgress(CapDone, CapTotal, '', CapDone, CapTotal, ASrcPath, ADstPath);
               end);
@@ -1792,7 +1843,7 @@ begin
       TThread.Queue(nil,
         procedure
         begin
-          if not FAlive then
+          if not Life.Alive then
             Exit;
           if FJob.Phase <> pjpRunning then
             Exit;
