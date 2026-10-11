@@ -48,7 +48,7 @@ function FileAttrPlanIsNoOp(const APlan: TFileAttrPlan): Boolean;
 begin
   Result := (APlan.ReadOnly = facKeep) and (APlan.Hidden = facKeep) and
     (APlan.System = facKeep) and (APlan.Archive = facKeep) and
-    (not APlan.ChangeOwner) and
+    (not APlan.ChangeOwner) and (not APlan.ChangeGroup) and (not APlan.ChangeMode) and
     not (APlan.SetCreated or APlan.SetModified or APlan.SetAccessed);
 end;
 
@@ -115,6 +115,7 @@ begin
   Result.Archive := facKeep;
   Result.Owner := '';
   Result.OwnerMixed := False;
+  Result.Mode := -1;
   if Length(APaths) = 0 then
   begin
     Result.Summary := 'No items';
@@ -136,6 +137,8 @@ begin
       Result.System := ChoiceFromFlag(Snap.System);
       Result.Archive := ChoiceFromFlag(Snap.Archive);
       Result.Owner := Snap.Owner;
+      Result.Mode := Snap.Mode;
+      Result.Group := Snap.Group;
       Result.Times := Snap.Times;
       First := False;
     end

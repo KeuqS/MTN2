@@ -25,6 +25,10 @@ type
   TElevatedLauncher = reference to function(const AParams: string;
     out AProcess: THandle; out AError: TVfsError): Boolean;
 
+  /// <summary>Asks for a password before a request (POSIX sudo); the
+  /// helper process of this build needs none, so nothing calls it.</summary>
+  TElevatedAuthPrompt = reference to procedure(const ADone: TProc<Boolean>);
+
   TElevatedFileVfs = class(TInterfacedObject, IVirtualFileSystem)
   private
     type
@@ -50,6 +54,7 @@ type
     FWatcher: TThread;
     FHelloEvent: TEvent;
     FOnActiveChanged: TProc<Boolean>;
+    FOnAuthenticate: TElevatedAuthPrompt;
     FLauncher: TElevatedLauncher;
     function EnsureConnected(out AError: TVfsError): Boolean;
     function Launch(out AError: TVfsError): Boolean;
@@ -77,6 +82,8 @@ type
     property OnActiveChanged: TProc<Boolean> read FOnActiveChanged
       write FOnActiveChanged;
     property Launcher: TElevatedLauncher read FLauncher write FLauncher;
+    property OnAuthenticate: TElevatedAuthPrompt read FOnAuthenticate
+      write FOnAuthenticate;
 
     procedure ListDirectoryAsync(const AURI: string; ACancel: IJobCancelToken;
       AOnDone: TVfsListCallback);
@@ -102,6 +109,13 @@ type
     procedure GetFreeSpaceAsync(const ARootURI: string; ACancel: IJobCancelToken;
       AOnDone: TVfsFreeSpaceCallback);
   end;
+
+/// <summary>True when administrator commands run without asking; the helper
+/// process of this build asks Windows itself, so this is always True.</summary>
+function ElevatedSessionOpen: Boolean;
+/// <summary>Validates an administrator password; this build asks Windows
+/// (UAC) instead and takes none, so it always accepts.</summary>
+function ElevatedAuthenticate(const APassword: string; out AError: string): Boolean;
 
 implementation
 
@@ -134,6 +148,17 @@ type
   public
     constructor Create(AOwner: TElevatedFileVfs);
   end;
+
+function ElevatedSessionOpen: Boolean;
+begin
+  Result := True;
+end;
+
+function ElevatedAuthenticate(const APassword: string; out AError: string): Boolean;
+begin
+  AError := '';
+  Result := True;
+end;
 
 constructor TReaderThread.Create(AOwner: TElevatedFileVfs);
 begin

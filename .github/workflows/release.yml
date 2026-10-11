@@ -49,6 +49,17 @@ jobs:
         # Unzips each package into a clean folder and runs MTN2.exe --self-check.
         run: ./src/tools/check-release.ps1 -Version $env:TAG
 
+      - name: Linux package
+        if: ${{ vars.LINUX_BUILD == 'true' }}
+        shell: pwsh
+        # The terminal program for Linux (needs the Linux SDK and WSL on the
+        # runner; enable with the repository variable LINUX_BUILD). The Linux
+        # self-updater takes MTN2-<tag>-linux-x64.tar.gz.
+        run: |
+          ./src/build-linux.ps1 -Rebuild
+          ./src/tests/run-tests-linux.ps1
+          ./src/tools/package-linux.ps1 -Version $env:TAG
+
       - name: Publish GitHub Release
         shell: pwsh
         env:
@@ -56,6 +67,7 @@ jobs:
         run: |
           $Zips = @(Get-ChildItem dist -Filter *.zip | ForEach-Object FullName)
           if ($Zips.Count -ne 2) { throw "expected 2 packages in dist, found $($Zips.Count)" }
+          $Zips += @(Get-ChildItem dist -Filter '*-linux-x64.*' | ForEach-Object FullName)
           gh release view $env:TAG *> $null
           if ($LASTEXITCODE -eq 0) {
             # Releases are immutable (repo setting): a published zip can't be

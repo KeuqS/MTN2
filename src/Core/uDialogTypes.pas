@@ -290,6 +290,10 @@ function BuildCreateLinkDialog(const ALinkName, ATarget: string;
 function BuildSetAttributesDialog(const ASummary, AOwnerNow, AOwnerEdit: string;
   AReadOnlyIdx, AHiddenIdx, AArchiveIdx, ASystemIdx: Integer;
   const ACreated, AModified, AAccessed: string): TDialogDeclaration;
+/// <summary>The permissions dialog (octal mode, owner and group) of POSIX
+/// builds; AMode holds the permission bits of the first item.</summary>
+function BuildSetModeDialog(const ASummary, AOwner, AGroup: string;
+  AMode: Integer): TDialogDeclaration;
 /// <summary>AItems are pre-formatted display labels, see SshConnectionDisplayLabel.</summary>
 function BuildSshConnectionsDialog(const AItems: TArray<string>;
   ASelectedIndex: Integer = 0): TDialogDeclaration;
@@ -393,7 +397,7 @@ function BuildKeymapEditDialog(const AActionName, AKeysText,
 implementation
 
 uses
-  uDialogResources, uDialogLocaleLayout, uDisplaySettings, uConsoleSettings, uStrings, uUpdater
+  uDialogResources, uFileAttrTypes, uDialogLocaleLayout, uDisplaySettings, uConsoleSettings, uStrings, uUpdater
   {$IFDEF SKIA}
   , FMX.Skia
   {$ENDIF}
@@ -1282,6 +1286,19 @@ begin
   DialogSetInputValue(Result, 'date_modified', AModified);
   DialogSetInputValue(Result, 'date_accessed', AAccessed);
   DialogSetLabelText(Result, 'date_error', '');
+end;
+
+function BuildSetModeDialog(const ASummary, AOwner, AGroup: string;
+  AMode: Integer): TDialogDeclaration;
+begin
+  RequireDialogResource(cResDialogSetMode, Result);
+  DialogSetLabelText(Result, 'summary', ASummary);
+  DialogSetInputValue(Result, 'mode', FileModeToOctal(AMode));
+  DialogSetLabelText(Result, 'mode_now', FileModeToSymbolic(AMode));
+  DialogSetLabelText(Result, 'mode_error', '');
+  DialogSetInputValue(Result, 'owner', AOwner);
+  DialogSetInputValue(Result, 'group', AGroup);
+  DialogSetCheckbox(Result, 'recurse', False);
 end;
 
 function BuildDirSyncDialog(const ASrcPath, ADstPath, AStatus: string;

@@ -24,6 +24,10 @@ function PlatformSevenZipEngine(const APluginDir: string): string;
 /// <summary>Sentence telling how to install the missing archive engine.</summary>
 function PlatformSevenZipEngineHint: string;
 
+/// <summary>Sets an environment variable of this process; children started
+/// afterwards inherit it.</summary>
+procedure PlatformSetEnvironment(const AName, AValue: string);
+
 /// <summary>Spawns AExe with AArgs, writes AStdIn to its stdin then closes it,
 /// captures merged stdout and stderr. ATimeoutMs = 0 waits until the process
 /// exits or ACancel is signalled. A timeout or cancel kills the child. A
@@ -59,6 +63,8 @@ type
     property Buf: TBytesStream read FBuf;
   end;
 
+function c_setenv(AName, AValue: MarshaledAString; AOverwrite: Integer): Integer; cdecl;
+  external libc name 'setenv';
 function c_pipe(AFds: PInteger): Integer; cdecl; external libc name 'pipe';
 function c_close(AFd: Integer): Integer; cdecl; external libc name 'close';
 function c_access(APath: MarshaledAString; AMode: Integer): Integer; cdecl; external libc name 'access';
@@ -146,6 +152,15 @@ end;
 function PlatformSevenZipEngineHint: string;
 begin
   Result := 'Install 7-Zip (package 7zip or p7zip-full) to open such files.';
+end;
+
+procedure PlatformSetEnvironment(const AName, AValue: string);
+var
+  N, V: UTF8String;
+begin
+  N := UTF8String(AName);
+  V := UTF8String(AValue);
+  c_setenv(MarshaledAString(N), MarshaledAString(V), 1);
 end;
 
 function PlatformSftpExeName: string;

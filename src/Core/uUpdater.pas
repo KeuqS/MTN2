@@ -31,7 +31,6 @@ const
   // Package name: <prefix><tag><suffix>, as src\tools\package-release.ps1
   // writes it.
   cUpdateAssetPrefix = 'MTN2-';
-  cUpdateAssetSuffix = '-win64.zip';
   cUpdateStagingDir = '.update-staging';
   cUpdateWaitPidSwitch = '--wait-pid';
   cNoSkiaSwitch = '--no-skia';
@@ -109,8 +108,9 @@ function FileSha256(const AFileName: string): string;
 function DownloadAsset(const ARelease: TUpdateRelease; const ADestFile: string;
   const AProgress: TUpdateProgress; out AError: string): Boolean;
 
-/// <summary>Unzips AZipFile into AStagingDir (recreated). Requires MTN2.exe at
-/// the package root and rejects entries escaping the folder.</summary>
+/// <summary>Unpacks the package AZipFile (a zip, or a tar.gz on POSIX) into
+/// AStagingDir (recreated). Requires the program file at the package root and
+/// rejects entries escaping the folder.</summary>
 function ExtractUpdate(const AZipFile, AStagingDir: string; out AError: string): Boolean;
 /// <summary>Moves every file under AStagingDir into AAppDir (same relative
 /// path), renaming each replaced file to *.old first. All-or-nothing.</summary>
@@ -148,7 +148,7 @@ implementation
 
 uses
   uPlatformUpdate, System.Math, System.IOUtils, System.JSON, System.Hash, System.Generics.Collections,
-  System.Zip, System.DateUtils, System.Net.HttpClient, System.Net.URLClient,
+  System.DateUtils, System.Net.HttpClient, System.Net.URLClient,
   uSession;
 
 function TryParseVersion(const AText: string; out AMajor, AMinor, APatch: Integer): Boolean;
@@ -393,9 +393,9 @@ begin
       end;
       Body := Resp.ContentAsString(TEncoding.UTF8);
       if ADevChannel then
-        Result := ParseDevReleaseJson(Body, cUpdateAssetSuffix, ARelease)
+        Result := ParseDevReleaseJson(Body, PlatformUpdateAssetSuffix, ARelease)
       else
-        Result := ParseLatestReleaseJson(Body, cUpdateAssetSuffix, ARelease);
+        Result := ParseLatestReleaseJson(Body, PlatformUpdateAssetSuffix, ARelease);
       if not Result then
         AError := 'GitHub: no suitable release package';
     except
@@ -471,9 +471,7 @@ end;
 
 function ExtractUpdate(const AZipFile, AStagingDir: string; out AError: string): Boolean;
 var
-  Zip: TZipFile;
-  I: Integer;
-  Name, Full, Root: string;
+  Main: string;
 begin
   Result := False;
   AError := '';
@@ -481,27 +479,12 @@ begin
     if TDirectory.Exists(AStagingDir) then
       TDirectory.Delete(AStagingDir, True);
     ForceDirectories(AStagingDir);
-    Root := IncludeTrailingPathDelimiter(TPath.GetFullPath(AStagingDir));
-    Zip := TZipFile.Create;
-    try
-      Zip.Open(AZipFile, zmRead);
-      for I := 0 to Zip.FileCount - 1 do
-      begin
-        Name := StringReplace(Zip.FileNames[I], '/', PathDelim, [rfReplaceAll]);
-        Full := TPath.GetFullPath(TPath.Combine(Root, Name));
-        if not Full.StartsWith(Root, True) then
-        begin
-          AError := 'unsafe path in package: ' + Zip.FileNames[I];
-          Exit;
-        end;
-      end;
-      Zip.ExtractAll(AStagingDir);
-    finally
-      Zip.Free;
-    end;
-    if not TFile.Exists(TPath.Combine(AStagingDir, 'MTN2.exe')) then
+    if not PlatformUnpackPackage(AZipFile, AStagingDir, AError) then
+      Exit;
+    Main := PlatformUpdateMainFile;
+    if not TFile.Exists(TPath.Combine(AStagingDir, Main)) then
     begin
-      AError := 'package has no MTN2.exe';
+      AError := 'package has no ' + Main;
       Exit;
     end;
     Result := True;

@@ -689,6 +689,9 @@ type
     /// <summary>Asks whether to repeat a failed operation with administrator
     /// rights; AAction runs after a yes (the UAC prompt follows).</summary>
     procedure OfferElevated(const AAction: TProc);
+    /// <summary>Asks for the administrator password (POSIX sudo) and reports
+    /// whether the system accepted it.</summary>
+    procedure AskElevationPassword(const ADone: TProc<Boolean>);
     procedure OpenPluginListDialog;
     procedure ShowPluginList(ASelectedIndex: Integer);
     procedure ShowPluginInfo(ARow: Integer);
@@ -1295,6 +1298,7 @@ begin
   FElevatedVfs := TElevatedFileVfs.Create(FVfs);
   FElevatedIntf := FElevatedVfs;
   FElevatedVfs.OnActiveChanged := HelperActiveChanged;
+  FElevatedVfs.OnAuthenticate := AskElevationPassword;
   FLeftModel := TFilePanelModel.Create(FVfs, cPanelWindowIdLeft);
   FRightModel := TFilePanelModel.Create(FVfs, cPanelWindowIdRight);
   FLeftModel.SetOnInvalidate(ModelInvalidated);
@@ -7646,6 +7650,53 @@ begin
      end) then
     Exit;
   NotifyChanged;
+end;
+
+procedure TDualPanelWindow.AskElevationPassword(const ADone: TProc<Boolean>);
+var
+  Decl: TDialogDeclaration;
+begin
+  Decl := BuildArchivePasswordDialog(T('ui.admin.passwordFor', 'Administrator rights (sudo)'),
+    T('ui.admin.passwordPrompt', 'Password:'));
+  Decl.Title := T('ui.admin.passwordTitle', 'Administrator password');
+  if ShowHostDialog(Decl,
+       procedure(ACmd, AValues: string)
+       var
+         Json: TJSONValue;
+         Password: string;
+       begin
+         if not FAlive or not DialogCmdIsAccept(ACmd) then
+         begin
+           ADone(False);
+           Exit;
+         end;
+         Password := '';
+         Json := TJSONObject.ParseJSONValue(AValues);
+         try
+           if Json is TJSONObject then
+             TJSONObject(Json).TryGetValue<string>('password', Password);
+         finally
+           Json.Free;
+         end;
+         TThread.CreateAnonymousThread(
+           procedure
+           var
+             Accepted: Boolean;
+             Msg: string;
+           begin
+             Accepted := ElevatedAuthenticate(Password, Msg);
+             TThread.Queue(nil,
+               procedure
+               begin
+                 if FAlive and not Accepted and Assigned(FToast) then
+                   FToast.Show(T('ui.admin.passwordRejected', 'Password was not accepted'),
+                     '', tkWarning);
+                 ADone(Accepted);
+               end);
+           end).Start;
+       end) then
+    Exit;
+  ADone(False);
 end;
 
 function TDualPanelWindow.ShowHostDialog(const ADecl: TDialogDeclaration;

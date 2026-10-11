@@ -13,6 +13,10 @@ interface
 uses
   uFileAttrTypes;
 
+/// <summary>True where files have permission bits and a group (the Set
+/// attributes command then shows the permissions dialog).</summary>
+function PlatformFileModeSupported: Boolean;
+
 /// <summary>Reads the attributes, owner and times of APath.</summary>
 function TryReadFileAttrSnapshot(const APath: string;
   out ASnap: TFileAttrSnapshot; out AError: string): Boolean;
@@ -35,6 +39,13 @@ type
   end;
   PPasswd = ^TPasswd;
 
+  TGroupEntry = record
+    gr_name: MarshaledAString;
+    gr_passwd: MarshaledAString;
+    gr_gid: Cardinal;
+  end;
+  PGroupEntry = ^TGroupEntry;
+
   TTimeVal = record
     Sec: Int64;
     USec: Int64;
@@ -42,6 +53,8 @@ type
 
 function c_getpwuid(AUid: Cardinal): PPasswd; cdecl; external libc name 'getpwuid';
 function c_getpwnam(AName: MarshaledAString): PPasswd; cdecl; external libc name 'getpwnam';
+function c_getgrgid(AGid: Cardinal): PGroupEntry; cdecl; external libc name 'getgrgid';
+function c_getgrnam(AName: MarshaledAString): PGroupEntry; cdecl; external libc name 'getgrnam';
 function c_chown(APath: MarshaledAString; AUid, AGid: Cardinal): Integer; cdecl;
   external libc name 'chown';
 function c_utimes(APath: MarshaledAString; ATimes: Pointer): Integer; cdecl;
@@ -75,6 +88,22 @@ begin
     Result := IntToStr(AUid);
 end;
 
+function GroupNameOf(AGid: Cardinal): string;
+var
+  G: PGroupEntry;
+begin
+  G := c_getgrgid(AGid);
+  if (G <> nil) and (G^.gr_name <> nil) then
+    Result := UTF8ToString(G^.gr_name)
+  else
+    Result := IntToStr(AGid);
+end;
+
+function PlatformFileModeSupported: Boolean;
+begin
+  Result := True;
+end;
+
 function TryReadFileAttrSnapshot(const APath: string;
   out ASnap: TFileAttrSnapshot; out AError: string): Boolean;
 var
@@ -93,6 +122,8 @@ begin
   ASnap.ReadOnly := (St.st_mode and S_IWUSR) = 0;
   ASnap.Hidden := Copy(ExtractFileName(ExcludeTrailingPathDelimiter(APath)), 1, 1) = '.';
   ASnap.Owner := UserNameOf(St.st_uid);
+  ASnap.Group := GroupNameOf(St.st_gid);
+  ASnap.Mode := St.st_mode and $FFF;
   ASnap.Times.Created := UnixToLocal(St.st_ctime);
   ASnap.Times.Modified := UnixToLocal(St.st_mtime);
   ASnap.Times.Accessed := UnixToLocal(St.st_atime);
@@ -110,7 +141,7 @@ const
 begin
   Result := False;
   AError := '';
-  if APlan.ReadOnly = facKeep then
+  if (APlan.ReadOnly = facKeep) and not APlan.ChangeMode then
     Exit(True);
   P := UTF8String(ExcludeTrailingPathDelimiter(APath));
   if stat(MarshaledAString(P), St) <> 0 then
@@ -119,7 +150,9 @@ begin
     Exit;
   end;
   Mode := St.st_mode and $FFF;
-  if APlan.ReadOnly = facSet then
+  if APlan.ChangeMode then
+    Mode := Cardinal(APlan.Mode) and $FFF
+  else if APlan.ReadOnly = facSet then
     Mode := Mode and not cWriteBits
   else
     Mode := Mode or S_IWUSR;
@@ -167,27 +200,47 @@ begin
   Result := True;
 end;
 
-function ApplyOwner(const APath, AOwner: string; out AError: string): Boolean;
+function ApplyOwner(const APath: string; const APlan: TFileAttrPlan;
+  out AError: string): Boolean;
 var
-  Name, P: UTF8String;
+  Name, GroupName, P: UTF8String;
   Pw: PPasswd;
+  Gr: PGroupEntry;
+  Uid, Gid: Cardinal;
 begin
   Result := False;
   AError := '';
-  if Trim(AOwner) = '' then
+  Uid := Cardinal(-1);
+  Gid := Cardinal(-1);
+  if APlan.ChangeOwner then
   begin
-    AError := 'Owner name is empty';
-    Exit;
+    if Trim(APlan.Owner) = '' then
+    begin
+      AError := 'Owner name is empty';
+      Exit;
+    end;
+    Name := UTF8String(Trim(APlan.Owner));
+    Pw := c_getpwnam(MarshaledAString(Name));
+    if Pw = nil then
+    begin
+      AError := 'Unknown account: ' + APlan.Owner;
+      Exit;
+    end;
+    Uid := Pw^.pw_uid;
   end;
-  Name := UTF8String(Trim(AOwner));
-  Pw := c_getpwnam(MarshaledAString(Name));
-  if Pw = nil then
+  if APlan.ChangeGroup and (Trim(APlan.Group) <> '') then
   begin
-    AError := 'Unknown account: ' + AOwner;
-    Exit;
+    GroupName := UTF8String(Trim(APlan.Group));
+    Gr := c_getgrnam(MarshaledAString(GroupName));
+    if Gr = nil then
+    begin
+      AError := 'Unknown group: ' + APlan.Group;
+      Exit;
+    end;
+    Gid := Gr^.gr_gid;
   end;
   P := UTF8String(ExcludeTrailingPathDelimiter(APath));
-  if c_chown(MarshaledAString(P), Pw^.pw_uid, Cardinal(-1)) <> 0 then
+  if c_chown(MarshaledAString(P), Uid, Gid) <> 0 then
   begin
     AError := SysErrorText;
     Exit;
@@ -200,6 +253,7 @@ function ApplyFileAttrOne(const APath: string; const APlan: TFileAttrPlan;
 var
   Err: string;
   Snap: TFileAttrSnapshot;
+  Plan: TFileAttrPlan;
 begin
   Result := False;
   AError := '';
@@ -213,12 +267,20 @@ begin
     AError := Err;
     Exit;
   end;
-  if APlan.ChangeOwner then
+  if APlan.ChangeOwner or (APlan.ChangeGroup and (Trim(APlan.Group) <> '')) then
   begin
-    if TryReadFileAttrSnapshot(APath, Snap, Err) and
-       SameText(Snap.Owner, Trim(APlan.Owner)) then
-      Exit(True);
-    if not ApplyOwner(APath, APlan.Owner, Err) then
+    // chown is skipped for what would not change, so a plain user can set the
+    // group of an item it owns without tripping over an unchanged owner.
+    Plan := APlan;
+    if TryReadFileAttrSnapshot(APath, Snap, Err) then
+    begin
+      if Plan.ChangeOwner and SameText(Snap.Owner, Trim(Plan.Owner)) then
+        Plan.ChangeOwner := False;
+      if Plan.ChangeGroup and SameText(Snap.Group, Trim(Plan.Group)) then
+        Plan.ChangeGroup := False;
+    end;
+    if (Plan.ChangeOwner or (Plan.ChangeGroup and (Trim(Plan.Group) <> ''))) and
+       not ApplyOwner(APath, Plan, Err) then
     begin
       AError := Err;
       Exit;

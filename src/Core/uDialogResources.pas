@@ -67,6 +67,7 @@ const
   cResDialogChecksum = 'DIALOG_CHECKSUM';
   cResDialogArchivePassword = 'DIALOG_ARCHIVEPASSWORD';
   cResDialogSetAttr = 'DIALOG_SETATTR';
+  cResDialogSetMode = 'DIALOG_SETMODE';
   cResDialogSshConnections = 'DIALOG_SSHCONNECTIONS';
   cResDialogSshConnectionEdit = 'DIALOG_SSHCONNECTIONEDIT';
   cResDialogAssociations = 'DIALOG_ASSOCIATIONS';

@@ -12,7 +12,8 @@ interface
 uses
   System.SysUtils, System.Classes, System.Types, System.UITypes, System.Math,
   uTerminalTypes, uThemeTypes, uThemeProxy, uThemeSpec, uMdiCompositor,
-  uDualPanelWindow, uConsoleWindow, uSession, uTermInput, uCoreTimer;
+  uDualPanelWindow, uConsoleWindow, uSession, uTermInput, uCoreTimer,
+  uUpdateController;
 
 type
   TTuiShell = class
@@ -30,6 +31,8 @@ type
     FDirty: Boolean;
     FQuit: Boolean;
     FPeekTimer: TCoreTimer;
+    FUpdater: TUpdateController;
+    FUpdateTimer: TCoreTimer;
     FLastClickTick: UInt64;
     FLastClickCol: Integer;
     FLastClickRow: Integer;
@@ -62,6 +65,8 @@ type
     // Commands of the dual panel window.
     procedure DualPanelContentChanged(Sender: TObject);
     procedure DualPanelQuitRequest(Sender: TObject);
+    procedure DualPanelOpenUpdates(Sender: TObject);
+    procedure UpdateTimerTick(Sender: TObject);
     procedure DualPanelOpenViewer(const AURI: string);
     procedure DualPanelOpenEditor(const AURI: string);
     procedure DualPanelRunCommand(const ACommand, AWorkingDir: string);
@@ -110,6 +115,12 @@ type
     procedure AttachPlugins(const APluginsDir: string);
     /// <summary>Stops the plugin host.</summary>
     procedure DetachPlugins;
+    /// <summary>Starts the self-updater: Help > Updates and the quiet check
+    /// shortly after the start.</summary>
+    procedure AttachUpdater;
+    /// <summary>Installs a staged update that was left for the exit, then
+    /// drops the updater.</summary>
+    procedure DetachUpdater;
     /// <summary>True when the screen must be composed again.</summary>
     property Dirty: Boolean read FDirty write FDirty;
     property Quit: Boolean read FQuit;
@@ -126,7 +137,7 @@ uses
   uEditorSearch, uEditorWindow, uBaseConsoleWindow, uPanelColumns, uThemeDrawing,
   uDualPanelDrag, uKeyChord, uDialogHost, uPlatformInfo, uTerminalWindow,
   uDualPanelUiTypes, uToast, uWindowChrome, uConsoleLaunch, uPluginHost,
-  uPluginPanelServices, uPluginServices, uPluginUi, uPluginChrome, uDialogTypes;
+  uPluginPanelServices, uPluginServices, uPluginUi, uPluginChrome, uDialogTypes, uVfsTypes;
 
 const
   cDefaultThemeFallback = 'NDN';
@@ -176,6 +187,8 @@ end;
 
 destructor TTuiShell.Destroy;
 begin
+  FreeAndNil(FUpdateTimer);
+  FreeAndNil(FUpdater);
   FreeAndNil(FPeekTimer);
   // The windows call back into the shell while they close.
   if Assigned(FDualPanel) then
@@ -505,6 +518,67 @@ end;
 procedure TTuiShell.DualPanelQuitRequest(Sender: TObject);
 begin
   FQuit := True;
+end;
+
+procedure TTuiShell.DualPanelOpenUpdates(Sender: TObject);
+begin
+  if Assigned(FUpdater) then
+    FUpdater.OpenUpdatesDialog;
+end;
+
+procedure TTuiShell.UpdateTimerTick(Sender: TObject);
+begin
+  FUpdateTimer.Enabled := False;
+  if Assigned(FUpdater) then
+    FUpdater.StartupCheck;
+end;
+
+procedure TTuiShell.AttachUpdater;
+var
+  Host: TUpdateHost;
+begin
+  Host.ShowDialog :=
+    function(ADecl: TDialogDeclaration; AOnCommand: TProc<string, string>): Boolean
+    begin
+      // Only over the panels: never inside an editor, viewer or terminal the
+      // user is working in. The controller retries later.
+      Result := Assigned(FDualPanel) and (FMdi.Active = FDualPanel) and
+        FDualPanel.Visible and FDualPanel.ShowHostDialog(ADecl, AOnCommand);
+      if Result then
+        Recompose;
+    end;
+  Host.HasBusyJob :=
+    function: Boolean
+    begin
+      Result := Assigned(FDualPanel) and FDualPanel.HasBusyJob;
+    end;
+  Host.RequestClose :=
+    procedure
+    begin
+      FQuit := True;
+    end;
+  Host.OpenFile :=
+    procedure(APath: string)
+    begin
+      DualPanelOpenViewer(PathToFileUri(APath));
+    end;
+  FUpdater := TUpdateController.Create(Host);
+  FDualPanel.OnOpenUpdates := DualPanelOpenUpdates;
+  FUpdateTimer := TCoreTimer.Create(nil);
+  FUpdateTimer.Interval := 5000;
+  FUpdateTimer.OnTimer := UpdateTimerTick;
+  FUpdateTimer.Enabled := True;
+end;
+
+procedure TTuiShell.DetachUpdater;
+begin
+  if Assigned(FUpdateTimer) then
+    FUpdateTimer.Enabled := False;
+  if Assigned(FUpdater) then
+    FUpdater.BeforeExit;
+  if Assigned(FDualPanel) then
+    FDualPanel.OnOpenUpdates := nil;
+  FreeAndNil(FUpdater);
 end;
 
 procedure TTuiShell.DualPanelOpenViewer(const AURI: string);

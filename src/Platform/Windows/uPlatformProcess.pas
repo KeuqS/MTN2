@@ -24,6 +24,10 @@ function PlatformSevenZipEngine(const APluginDir: string): string;
 /// <summary>Sentence telling how to install the missing archive engine.</summary>
 function PlatformSevenZipEngineHint: string;
 
+/// <summary>Sets an environment variable of this process; children started
+/// afterwards inherit it.</summary>
+procedure PlatformSetEnvironment(const AName, AValue: string);
+
 /// <summary>Spawns AExe with AArgs, writes AStdIn to its stdin then closes it,
 /// captures merged stdout and stderr. ATimeoutMs = 0 waits until the process
 /// exits or ACancel is signalled. A timeout or cancel kills the child. A
@@ -63,6 +67,11 @@ end;
 function PlatformSevenZipEngineHint: string;
 begin
   Result := 'Put 7z.dll into plugins\mtn.7z\ to open such files.';
+end;
+
+procedure PlatformSetEnvironment(const AName, AValue: string);
+begin
+  SetEnvironmentVariable(PChar(AName), PChar(AValue));
 end;
 
 function PlatformSftpExeName: string;

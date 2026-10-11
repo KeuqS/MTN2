@@ -32,7 +32,11 @@ implementation
 uses
   uTestPaths,
   System.SysUtils, System.Classes, System.IOUtils, System.Zip, System.DateUtils,
-  uUpdater, uPlatformPaths;
+  uUpdater, uPlatformPaths, uPlatformUpdate, uPlatformProcess;
+
+const
+  // The fixtures of the release parsers name Windows packages.
+  cWinAssetSuffix = '-win64.zip';
 
 var
   GTemp: string;
@@ -94,7 +98,7 @@ procedure TestReleaseJson;
 var
   R: TUpdateRelease;
 begin
-  Assert.IsTrue(ParseLatestReleaseJson(cReleaseJson, cUpdateAssetSuffix, R), 'parses a normal release');
+  Assert.IsTrue(ParseLatestReleaseJson(cReleaseJson, cWinAssetSuffix, R), 'parses a normal release');
   Assert.IsTrue(R.Version = '0.3.2', 'version from tag');
   Assert.IsTrue(R.AssetName = 'MTN2-v0.3.2-win64.zip', 'picks the -win64.zip asset, not the first one');
   Assert.IsTrue(R.AssetSize = 21874456, 'asset size');
@@ -102,14 +106,14 @@ begin
     'digest lowercased, sha256: prefix stripped');
   Assert.IsTrue(R.HtmlUrl.EndsWith('/v0.3.2'), 'release page url');
   Assert.IsTrue(not ParseLatestReleaseJson(StringReplace(cReleaseJson, '"draft":false', '"draft":true', []),
-    cUpdateAssetSuffix, R), 'draft ignored');
+    cWinAssetSuffix, R), 'draft ignored');
   Assert.IsTrue(not ParseLatestReleaseJson(StringReplace(cReleaseJson, '"prerelease":false',
-    '"prerelease":true', []), cUpdateAssetSuffix, R), 'prerelease ignored');
+    '"prerelease":true', []), cWinAssetSuffix, R), 'prerelease ignored');
   Assert.IsTrue(not ParseLatestReleaseJson(StringReplace(cReleaseJson, '-win64.zip', '-linux.tar.gz',
-    [rfReplaceAll]), cUpdateAssetSuffix, R), 'no win64 package -> nothing to offer');
+    [rfReplaceAll]), cWinAssetSuffix, R), 'no win64 package -> nothing to offer');
   Assert.IsTrue(not ParseLatestReleaseJson(StringReplace(cReleaseJson, 'v0.3.2"', 'nightly"', []),
-    cUpdateAssetSuffix, R), 'non-version tag ignored');
-  Assert.IsTrue(not ParseLatestReleaseJson('not json', cUpdateAssetSuffix, R), 'garbage ignored');
+    cWinAssetSuffix, R), 'non-version tag ignored');
+  Assert.IsTrue(not ParseLatestReleaseJson('not json', cWinAssetSuffix, R), 'garbage ignored');
 
   // Other packages of the same release, listed first, must not be taken for
   // the regular one -- even one whose name also ends in -win64.zip.
@@ -117,15 +121,15 @@ begin
     '"assets":[{"name":"MTN2-v0.3.2-win64-portable.zip","size":1,' +
     '"browser_download_url":"https://x/portable.zip"},' +
     '{"name":"MTN2-v0.3.2-portable-win64.zip","size":2,' +
-    '"browser_download_url":"https://x/portable2.zip"},', []), cUpdateAssetSuffix, R),
+    '"browser_download_url":"https://x/portable2.zip"},', []), cWinAssetSuffix, R),
     'release with extra packages still parses');
   Assert.IsTrue(R.AssetName = 'MTN2-v0.3.2-win64.zip',
     'picks exactly MTN2-<tag>-win64.zip, not a portable package: ' + R.AssetName);
   Assert.IsTrue(not ParseLatestReleaseJson(StringReplace(cReleaseJson, 'MTN2-v0.3.2-win64.zip',
-    'MTN2-v0.3.2-portable-win64.zip', [rfReplaceAll]), cUpdateAssetSuffix, R),
+    'MTN2-v0.3.2-portable-win64.zip', [rfReplaceAll]), cWinAssetSuffix, R),
     'only a portable package -> nothing to offer');
   Assert.IsTrue(not ParseLatestReleaseJson(StringReplace(cReleaseJson, 'MTN2-v0.3.2-win64.zip',
-    'MTN2-v0.3.1-win64.zip', [rfReplaceAll]), cUpdateAssetSuffix, R),
+    'MTN2-v0.3.1-win64.zip', [rfReplaceAll]), cWinAssetSuffix, R),
     'a package named for another tag is not this release''s package');
 end;
 
@@ -143,22 +147,22 @@ procedure TestDevReleaseJson;
 var
   R: TUpdateRelease;
 begin
-  Assert.IsTrue(ParseDevReleaseJson(cDevJson, cUpdateAssetSuffix, R), 'parses the rolling prerelease');
+  Assert.IsTrue(ParseDevReleaseJson(cDevJson, cWinAssetSuffix, R), 'parses the rolling prerelease');
   Assert.AreEqual('0.3.12.10', R.Version, 'highest build wins, compared numerically');
   Assert.AreEqual('MTN2-v0.3.12.10-win64.zip', R.AssetName);
   Assert.AreEqual('https://x/10.zip', R.AssetUrl);
   Assert.AreEqual('v0.3.12.10', R.Tag);
   Assert.IsTrue(ParseDevReleaseJson(StringReplace(cDevJson, 'MTN2-v0.3.12.10-win64.zip',
-    'MTN2-v0.3.12.10-win64-x.zip', []), cUpdateAssetSuffix, R), 'other packages skipped');
+    'MTN2-v0.3.12.10-win64-x.zip', []), cWinAssetSuffix, R), 'other packages skipped');
   Assert.AreEqual('0.3.12.9', R.Version, 'portable and foreign names are not taken');
   Assert.AreEqual('abcd', R.AssetSha256, 'digest lowercased');
   Assert.IsTrue(not ParseDevReleaseJson(StringReplace(cDevJson, '"draft":false', '"draft":true', []),
-    cUpdateAssetSuffix, R), 'draft ignored');
+    cWinAssetSuffix, R), 'draft ignored');
   Assert.IsTrue(not ParseDevReleaseJson(StringReplace(cDevJson, '0.3.12.', '0.3.12-', [rfReplaceAll]),
-    cUpdateAssetSuffix, R), 'package without a build number ignored');
-  Assert.IsTrue(not ParseDevReleaseJson('not json', cUpdateAssetSuffix, R), 'garbage ignored');
+    cWinAssetSuffix, R), 'package without a build number ignored');
+  Assert.IsTrue(not ParseDevReleaseJson('not json', cWinAssetSuffix, R), 'garbage ignored');
   Assert.IsTrue(ParseDevReleaseJson(StringReplace(StringReplace(cDevJson, '0.3.12.9', '0.3.13.0',
-    [rfReplaceAll]), '0.3.12.10', '0.3.13.0', [rfReplaceAll]), cUpdateAssetSuffix, R),
+    [rfReplaceAll]), '0.3.12.10', '0.3.13.0', [rfReplaceAll]), cWinAssetSuffix, R),
     'build 0, the first build after a release, is a valid dev package');
   Assert.AreEqual('0.3.13.0', R.Version, 'build 0 version');
 end;
@@ -173,37 +177,70 @@ begin
     'sha256("abc") matches the FIPS vector');
 end;
 
-procedure MakeZip(const AZip: string; const ANames, ATexts: array of string);
+// A release package: a zip on Windows; on POSIX a tar.gz with a top folder,
+// where a name starting with ../ becomes an entry that climbs out of it.
+procedure MakePackage(const APackage: string; const ANames, ATexts: array of string);
 var
   Z: TZipFile;
   I: Integer;
+  Dir, Top, Output, Rel: string;
+  Code: Cardinal;
+  Args: TArray<string>;
 begin
-  Z := TZipFile.Create;
-  try
-    Z.Open(AZip, zmWrite);
-    for I := 0 to High(ANames) do
-      Z.Add(TEncoding.UTF8.GetBytes(ATexts[I]), ANames[I]);
-  finally
-    Z.Free;
+  if not PlatformPosixPaths then
+  begin
+    Z := TZipFile.Create;
+    try
+      Z.Open(APackage, zmWrite);
+      for I := 0 to High(ANames) do
+        Z.Add(TEncoding.UTF8.GetBytes(ATexts[I]), ANames[I]);
+    finally
+      Z.Free;
+    end;
+    Exit;
   end;
+  Dir := TPath.Combine(GTemp, 'mk');
+  if TDirectory.Exists(Dir) then
+    TDirectory.Delete(Dir, True);
+  Top := TPath.Combine(Dir, 'mtn2');
+  ForceDirectories(Top);
+  Args := ['-czf', APackage, '-C', Dir, 'mtn2'];
+  for I := 0 to High(ANames) do
+  begin
+    Rel := ANames[I];
+    if Rel.StartsWith('../') then
+    begin
+      TFile.WriteAllText(TPath.Combine(Top, 'escape'), ATexts[I], TEncoding.UTF8);
+      Args := Args + ['--transform', 's,^mtn2/escape$,mtn2/' + Rel + ',S'];
+    end
+    else
+    begin
+      ForceDirectories(ExtractFileDir(TPath.Combine(Top, Rel)));
+      TFile.WriteAllText(TPath.Combine(Top, Rel), ATexts[I], TEncoding.UTF8);
+    end;
+  end;
+  if TFile.Exists(APackage) then
+    TFile.Delete(APackage);
+  PlatformRunCaptured('tar', Args, '', 60000, nil, Output, Code);
+  Assert.AreEqual(0, Integer(Code), 'tar builds the package: ' + Output);
 end;
 
 procedure TestExtract;
 var
   Zip, Stage, Err: string;
 begin
-  Zip := TPath.Combine(GTemp, 'pkg.zip');
+  Zip := TPath.Combine(GTemp, 'pkg' + PlatformUpdateAssetSuffix);
   Stage := TPath.Combine(GTemp, 'stage');
-  MakeZip(Zip, ['MTN2.exe', 'plugins/mtn.ws/plugin.json'], ['new exe', 'new plugin']);
+  MakePackage(Zip, [PlatformUpdateMainFile, 'plugins/mtn.ws/plugin.json'], ['new exe', 'new plugin']);
   Assert.IsTrue(ExtractUpdate(Zip, Stage, Err), 'extracts a package: ' + Err);
   Assert.IsTrue(ReadText(TPath.Combine(Stage, NativePath('plugins/mtn.ws/plugin.json'))) = 'new plugin',
     'nested files keep their folders');
 
-  MakeZip(Zip, ['readme.txt'], ['x']);
-  Assert.IsTrue(not ExtractUpdate(Zip, Stage, Err) and (Pos('MTN2.exe', Err) > 0),
-    'package without MTN2.exe rejected');
+  MakePackage(Zip, ['readme.txt'], ['x']);
+  Assert.IsTrue(not ExtractUpdate(Zip, Stage, Err) and (Pos(PlatformUpdateMainFile, Err) > 0),
+    'package without the program file rejected');
 
-  MakeZip(Zip, ['MTN2.exe', '../evil.txt'], ['x', 'y']);
+  MakePackage(Zip, [PlatformUpdateMainFile, '../evil.txt'], ['x', 'y']);
   Assert.IsTrue(not ExtractUpdate(Zip, Stage, Err) and (Pos('unsafe', Err) > 0),
     'entry escaping the staging folder rejected');
   Assert.IsTrue(not TFile.Exists(TPath.Combine(GTemp, 'evil.txt')), 'nothing written outside');
@@ -332,7 +369,7 @@ begin
     Exit;
   end;
   Assert.IsTrue(R.Version <> '', 'latest release has a version: ' + R.Tag);
-  Assert.IsTrue(SameText(R.AssetName, cUpdateAssetPrefix + R.Tag + cUpdateAssetSuffix),
+  Assert.IsTrue(SameText(R.AssetName, cUpdateAssetPrefix + R.Tag + PlatformUpdateAssetSuffix),
     'has the regular win64 package: ' + R.AssetName);
   Assert.IsTrue(Length(R.AssetSha256) = 64, 'GitHub publishes its sha256');
 end;

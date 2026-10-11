@@ -30,6 +30,9 @@ Copy-Item (Join-Path $Root 'LICENSE') $Stage
 Copy-Item (Join-Path $Root 'THIRD-PARTY.md') $Stage
 Copy-Item (Join-Path $Root 'CHANGELOG.md') $Stage
 Copy-Item (Join-Path $Root 'docs\LINUX.md') $Stage
+# A shell script must keep LF endings whatever the checkout did to them.
+$Install = (Get-Content (Join-Path $PSScriptRoot 'install-linux.sh') -Raw).Replace("`r`n", "`n")
+[IO.File]::WriteAllText((Join-Path $Stage 'install.sh'), $Install, (New-Object Text.UTF8Encoding $false))
 # The program has no version resource on Linux; it reads this file (uPlatformUpdate).
 [IO.File]::WriteAllText((Join-Path $Stage 'version'), ($Version -replace '^v', '') + "`n", (New-Object Text.UTF8Encoding $false))
 
@@ -42,7 +45,33 @@ function ConvertTo-WslPath([string]$Path) {
 }
 $WslStage = ConvertTo-WslPath (Split-Path $Stage -Parent)
 $WslArchive = ConvertTo-WslPath $Archive
-wsl -d $Distro -- bash -c "cd '$WslStage' && chmod 755 mtn2/mtn2-tui && tar czf '$WslArchive' --owner=0 --group=0 mtn2"
+wsl -d $Distro -- bash -c "cd '$WslStage' && chmod 755 mtn2/mtn2-tui mtn2/install.sh && tar czf '$WslArchive' --owner=0 --group=0 mtn2"
 if ($LASTEXITCODE -ne 0) { throw "tar failed with $LASTEXITCODE" }
-Remove-Item (Join-Path $Dist 'linux-stage') -Recurse -Force
 Write-Host "OK: $Archive"
+
+# A Debian package: the same folder under /opt/mtn2 and the command /usr/bin/mtn2.
+$Deb = Join-Path $Dist "MTN2-$Safe-linux-x64.deb"
+if (Test-Path $Deb) { Remove-Item $Deb -Force }
+$DebRoot = Join-Path $Dist 'linux-stage\deb'
+New-Item -ItemType Directory -Force -Path (Join-Path $DebRoot 'DEBIAN'), (Join-Path $DebRoot 'opt'), (Join-Path $DebRoot 'usr\bin') | Out-Null
+Copy-Item $Stage (Join-Path $DebRoot 'opt\mtn2') -Recurse
+$Control = @(
+    'Package: mtn2',
+    "Version: $($Version -replace '^v', '')",
+    'Section: utils',
+    'Priority: optional',
+    'Architecture: amd64',
+    'Maintainer: MTN2 <noreply@users.noreply.github.com>',
+    'Homepage: https://github.com/Laex/MTN2',
+    'Recommends: 7zip | p7zip-full',
+    'Description: Dual-panel file manager for the terminal',
+    ' Modern Terminal Navigator 2: two panels with tabs, viewer, editor,',
+    ' terminals, SFTP and archives, drawn inside an ordinary terminal.') -join "`n"
+[IO.File]::WriteAllText((Join-Path $DebRoot 'DEBIAN\control'), $Control + "`n", (New-Object Text.UTF8Encoding $false))
+$WslDeb = ConvertTo-WslPath $Deb
+$WslDebRoot = ConvertTo-WslPath $DebRoot
+# Permissions are only honored on the WSL file system, so the tree is built there.
+wsl -d $Distro -- bash -c "rm -rf /tmp/mtn2-deb && cp -r '$WslDebRoot' /tmp/mtn2-deb && cd /tmp/mtn2-deb && chmod 755 DEBIAN opt/mtn2/mtn2-tui opt/mtn2/install.sh && ln -s /opt/mtn2/mtn2-tui usr/bin/mtn2 && dpkg-deb --root-owner-group --build . /tmp/mtn2.deb > /dev/null && cp /tmp/mtn2.deb '$WslDeb'; rc=`$?; rm -rf /tmp/mtn2-deb /tmp/mtn2.deb; exit `$rc"
+if ($LASTEXITCODE -ne 0) { throw "dpkg-deb failed with $LASTEXITCODE" }
+Remove-Item (Join-Path $Dist 'linux-stage') -Recurse -Force
+Write-Host "OK: $Deb"

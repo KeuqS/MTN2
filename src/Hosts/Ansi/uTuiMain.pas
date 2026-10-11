@@ -14,7 +14,8 @@ implementation
 uses
   System.SysUtils, System.Classes, System.Generics.Collections, System.IOUtils,
   uTerminalTypes, uTermInput, uAnsiFrame, uAnsiTerm, uAnsiClipboard, uTuiShell,
-  uCoreTimer, uPlatformInfo, uUpdater, uConfigLocation, uResourceAccess, uSelfCheck;
+  uCoreTimer, uPlatformInfo, uUpdater, uConfigLocation, uResourceAccess, uSelfCheck,
+  uPlatformUpdate;
 
 const
   cEscapeWaitMs = 30;
@@ -193,6 +194,7 @@ begin
         end);
       Shell := TTuiShell.Create(Cols, Rows);
       Shell.AttachPlugins(PluginsDir);
+      Shell.AttachUpdater;
       if AOptions.Path <> '' then
         Shell.DualPanel.OpenPathAsNewTab(AOptions.Path);
       LastInput := PlatformTickCount64;
@@ -265,7 +267,10 @@ begin
       Shell.PersistSession;
     finally
       if Assigned(Shell) then
+      begin
+        Shell.DetachUpdater;
         Shell.DetachPlugins;
+      end;
       Shell.Free;
       Term.WriteText(#27'[>4;0m' + AnsiLeaveSequence + #27'[23;2t');
       Term.LeaveRaw;
@@ -276,6 +281,8 @@ begin
     Parser.Free;
     Term.Free;
   end;
+  // An update that asked for a restart starts here, on the restored terminal.
+  PlatformExecPendingStart;
 end;
 
 function RunTui: Integer;

@@ -12,6 +12,10 @@ interface
 uses
   uFileAttrTypes;
 
+/// <summary>True where files have permission bits and a group (the Set
+/// attributes command then shows the permissions dialog).</summary>
+function PlatformFileModeSupported: Boolean;
+
 /// <summary>Reads the attributes, owner and times of APath.</summary>
 function TryReadFileAttrSnapshot(const APath: string;
   out ASnap: TFileAttrSnapshot; out AError: string): Boolean;
@@ -120,6 +124,11 @@ begin
   end;
 end;
 
+function PlatformFileModeSupported: Boolean;
+begin
+  Result := False;
+end;
+
 function TryReadFileAttrSnapshot(const APath: string;
   out ASnap: TFileAttrSnapshot; out AError: string): Boolean;
 var
@@ -127,6 +136,7 @@ var
 begin
   Result := False;
   ASnap := Default(TFileAttrSnapshot);
+  ASnap.Mode := -1;
   AError := '';
   Attr := GetFileAttributes(PChar(WinApiPath(APath)));
   if Attr = INVALID_FILE_ATTRIBUTES then

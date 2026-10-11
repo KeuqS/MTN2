@@ -166,6 +166,8 @@ type
     /// No-op if AId isn't a dckInput.</summary>
     procedure SetInputValue(const AId, AValue: string);
     function GetCheckbox(const AId: string): Boolean;
+    /// <summary>Sets a dckCheckbox of the open dialog; no-op for other ids.</summary>
+    procedure SetCheckbox(const AId: string; AChecked: Boolean);
     function GetRadio(const AGroupId: string): string;
     function GetListSelectedIndex(const AId: string): Integer;
     function GetListSelectedText(const AId: string): string;
@@ -1085,6 +1087,18 @@ begin
   for I := 0 to High(FDecl.Controls) do
     if (FDecl.Controls[I].Kind = dckCheckbox) and SameText(FDecl.Controls[I].Id, AId) then
       Exit(FDecl.Controls[I].Checked);
+end;
+
+procedure TDialogHost.SetCheckbox(const AId: string; AChecked: Boolean);
+var
+  I: Integer;
+begin
+  for I := 0 to High(FDecl.Controls) do
+    if (FDecl.Controls[I].Kind = dckCheckbox) and SameText(FDecl.Controls[I].Id, AId) then
+    begin
+      FDecl.Controls[I].Checked := AChecked;
+      Exit;
+    end;
 end;
 
 function TDialogHost.GetRadio(const AGroupId: string): string;

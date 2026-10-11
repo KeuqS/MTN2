@@ -10,6 +10,19 @@ interface
 /// version information. The build number is left out when it is 0.</summary>
 function PlatformFileVersion(const AExeFile: string): string;
 
+/// <summary>Ending of the release package name for this platform
+/// (-win64.zip, -linux-x64.tar.gz).</summary>
+function PlatformUpdateAssetSuffix: string;
+
+/// <summary>Name of the program file a package must hold at its top level.</summary>
+function PlatformUpdateMainFile: string;
+
+/// <summary>Unpacks APackage into the existing folder AStagingDir; the top
+/// folder of a tar.gz package is dropped. Refuses entries that would land
+/// outside AStagingDir.</summary>
+function PlatformUnpackPackage(const APackage, AStagingDir: string;
+  out AError: string): Boolean;
+
 /// <summary>Renames or moves a file, also across volumes. With AReplace an
 /// existing destination is overwritten; without it the move fails instead.</summary>
 function PlatformMoveFile(const ASource, ADest: string; AReplace: Boolean;
@@ -25,13 +38,17 @@ function PlatformCurrentProcessId: Cardinal;
 function PlatformStartProcess(const AExeFile, AArguments: string;
   out AError: string): Boolean;
 
+/// <summary>Nothing to do here: the process PlatformStartProcess starts is
+/// already running. The POSIX build starts its program from this call.</summary>
+procedure PlatformExecPendingStart;
+
 /// <summary>Waits until the process has exited or ATimeoutMs passed.</summary>
 procedure PlatformWaitForProcess(APid: Cardinal; ATimeoutMs: Cardinal);
 
 implementation
 
 uses
-  System.SysUtils, System.IOUtils, Winapi.Windows;
+  System.SysUtils, System.IOUtils, System.Zip, Winapi.Windows;
 
 function PlatformFileVersion(const AExeFile: string): string;
 var
@@ -52,6 +69,51 @@ begin
     HiWord(Info.dwFileVersionLS)]);
   if LoWord(Info.dwFileVersionLS) <> 0 then
     Result := Result + '.' + IntToStr(LoWord(Info.dwFileVersionLS));
+end;
+
+function PlatformUpdateAssetSuffix: string;
+begin
+  Result := '-win64.zip';
+end;
+
+function PlatformUpdateMainFile: string;
+begin
+  Result := 'MTN2.exe';
+end;
+
+function PlatformUnpackPackage(const APackage, AStagingDir: string;
+  out AError: string): Boolean;
+var
+  Zip: TZipFile;
+  I: Integer;
+  Name, Full, Root: string;
+begin
+  Result := False;
+  AError := '';
+  try
+    Root := IncludeTrailingPathDelimiter(TPath.GetFullPath(AStagingDir));
+    Zip := TZipFile.Create;
+    try
+      Zip.Open(APackage, zmRead);
+      for I := 0 to Zip.FileCount - 1 do
+      begin
+        Name := StringReplace(Zip.FileNames[I], '/', PathDelim, [rfReplaceAll]);
+        Full := TPath.GetFullPath(TPath.Combine(Root, Name));
+        if not Full.StartsWith(Root, True) then
+        begin
+          AError := 'unsafe path in package: ' + Zip.FileNames[I];
+          Exit;
+        end;
+      end;
+      Zip.ExtractAll(AStagingDir);
+    finally
+      Zip.Free;
+    end;
+    Result := True;
+  except
+    on E: Exception do
+      AError := E.Message;
+  end;
 end;
 
 function PlatformMoveFile(const ASource, ADest: string; AReplace: Boolean;
@@ -108,6 +170,10 @@ begin
   end
   else
     AError := SysErrorMessage(GetLastError);
+end;
+
+procedure PlatformExecPendingStart;
+begin
 end;
 
 procedure PlatformWaitForProcess(APid: Cardinal; ATimeoutMs: Cardinal);

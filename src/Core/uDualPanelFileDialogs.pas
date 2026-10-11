@@ -59,6 +59,8 @@ type
     // an unchanged field is not written, so seconds-truncated display text
     // never rounds away a file's sub-second time.
     FAttrDateTexts: array[0..2] of string;
+    FAttrModeDialog: Boolean;
+    FAttrModeText, FAttrOwnerText, FAttrGroupText: string;
     function ReadAttrDateFields(var APlan: TFileAttrPlan; out ABadText: string): Boolean;
     procedure KeepSetAttributesOpen;
     procedure SetKind(AKind: THostDialogKind);
@@ -98,6 +100,7 @@ type
       const AControlId: string);
     procedure DispatchCreateLinkCommand(const AControlId: string);
     function DispatchSetAttributesCommand(const AControlId: string): Boolean;
+    function DispatchSetModeCommand(const AControlId: string): Boolean;
     function DispatchCommand(AKind: THostDialogKind;
       const AControlId: string): Boolean;
   end;
@@ -105,7 +108,7 @@ type
 implementation
 
 uses
-  uDialogResources;
+  System.StrUtils, uDialogResources, uPlatformFileAttr;
 
 constructor TFileOpDialogController.Create(ADialog: TDialogHost;
   const AOnCommand: TDialogCommandEvent; const AOnSetKind: TFileOpKindSetter;
@@ -376,6 +379,17 @@ begin
     OwnerEdit := '';
   UnfocusCmd;
   SetKind(hdkSetAttributes);
+  FAttrModeDialog := PlatformFileModeSupported and (State.Mode >= 0);
+  if FAttrModeDialog then
+  begin
+    FAttrModeText := FileModeToOctal(State.Mode);
+    FAttrOwnerText := OwnerEdit;
+    FAttrGroupText := IfThen(State.OwnerMixed, '', State.Group);
+    FDialog.Open(BuildSetModeDialog(State.Summary, FAttrOwnerText, FAttrGroupText,
+      State.Mode), FOnCommand);
+    Notify;
+    Exit;
+  end;
   FDialog.Open(BuildSetAttributesDialog(State.Summary, State.Owner, OwnerEdit,
     FileAttrChoiceToIndex(State.ReadOnly), FileAttrChoiceToIndex(State.Hidden),
     FileAttrChoiceToIndex(State.Archive), FileAttrChoiceToIndex(State.System),
@@ -495,6 +509,46 @@ begin
   end;
 end;
 
+function TFileOpDialogController.DispatchSetModeCommand(
+  const AControlId: string): Boolean;
+var
+  Accepted: Boolean;
+  Plan: TFileAttrPlan;
+  ModeText: string;
+begin
+  Result := True;
+  Accepted := not DialogCmdIsReject(AControlId);
+  Plan := Default(TFileAttrPlan);
+  if Accepted then
+  begin
+    ModeText := Trim(FDialog.GetInputValue('mode'));
+    // Only what differs from what the dialog opened with is written.
+    if ModeText <> FAttrModeText then
+    begin
+      if not TryParseFileMode(ModeText, Plan.Mode) then
+      begin
+        FDialog.SetLabelText('mode_error',
+          T('ui.setAttr.badMode', 'Invalid mode: %s', [ModeText]));
+        KeepSetAttributesOpen;
+        Exit;
+      end;
+      Plan.ChangeMode := True;
+    end;
+    Plan.Owner := Trim(FDialog.GetInputValue('owner'));
+    Plan.ChangeOwner := (Plan.Owner <> '') and (Plan.Owner <> FAttrOwnerText);
+    Plan.Group := Trim(FDialog.GetInputValue('group'));
+    Plan.ChangeGroup := (Plan.Group <> '') and (Plan.Group <> FAttrGroupText);
+    Plan.Recurse := FDialog.GetCheckbox('recurse');
+  end;
+  FDialog.Close;
+  if not Accepted then
+    Exit;
+  if FileAttrPlanIsNoOp(Plan) then
+    Exit;
+  if Assigned(FOnApplySetAttr) then
+    FOnApplySetAttr(FAttrPaths, Plan);
+end;
+
 function TFileOpDialogController.DispatchSetAttributesCommand(
   const AControlId: string): Boolean;
 var
@@ -567,7 +621,11 @@ begin
     hdkCopyInPlace: DispatchSimpleNameCommand(AControlId, FOnConfirmCopyInPlace);
     hdkSelectMask, hdkUnselectMask: DispatchSelectMaskCommand(AKind, AControlId);
     hdkCreateLink: DispatchCreateLinkCommand(AControlId);
-    hdkSetAttributes: Result := DispatchSetAttributesCommand(AControlId);
+    hdkSetAttributes:
+      if FAttrModeDialog then
+        Result := DispatchSetModeCommand(AControlId)
+      else
+        Result := DispatchSetAttributesCommand(AControlId);
   else
     { not a file-op dialog }
   end;

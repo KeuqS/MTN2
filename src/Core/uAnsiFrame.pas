@@ -176,6 +176,7 @@ begin
     + #27'[?7l'               // no auto wrap
     + #27'[?2004h'            // bracketed paste
     + #27'[>5u'               // kitty keyboard: disambiguate + alternate keys
+    + #27'[>4;2m'             // xterm modifyOtherKeys 2 for terminals without kitty keys
     + #27'[?u'                // ask for the kitty keyboard flags
     + #27'[c';                // device attributes: ends the query
   if AMouse then
@@ -187,6 +188,7 @@ function AnsiLeaveSequence: string;
 begin
   Result := #27'[?1006l' + #27'[?1002l' + #27'[?1000l'
     + #27'[<u'                // pop the kitty keyboard flags
+    + #27'[>4;0m'             // modifyOtherKeys off
     + #27'[?2004l'
     + #27'[?7h'
     + #27'[0m'

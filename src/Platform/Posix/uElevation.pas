@@ -1,8 +1,10 @@
 unit uElevation;
 
 { The rights this process runs with (POSIX build): administrator means the
-  effective user is root. The Windows build lives in Platform\Windows; each
-  project puts exactly one of the two directories on its unit search path. }
+  effective user is root; a plain user gets administrator rights for single
+  operations through sudo (uElevatedVfs). The Windows build lives in
+  Platform\Windows; each project puts exactly one of the two directories on
+  its unit search path. }
 
 interface
 
@@ -12,8 +14,8 @@ type
 /// <summary>True when the process runs as root.</summary>
 function IsProcessElevated: Boolean;
 function CurrentProcessRights: TProcessRights;
-/// <summary>True where a helper process with administrator rights can be
-/// started on request.</summary>
+/// <summary>True where administrator rights can be asked for on request: the
+/// process is not root and sudo is installed.</summary>
 function ElevationAvailable: Boolean;
 /// <summary>Short label for the window title: "Administrator", or '' for a user.</summary>
 function ProcessRightsLabel(ARights: TProcessRights): string;
@@ -21,7 +23,11 @@ function ProcessRightsLabel(ARights: TProcessRights): string;
 implementation
 
 uses
-  Posix.Base;
+  System.SysUtils, Posix.Base, uPlatformProcess;
+
+var
+  GSudoChecked: Boolean;
+  GSudoFound: Boolean;
 
 function c_geteuid: Cardinal; cdecl; external libc name 'geteuid';
 
@@ -39,8 +45,19 @@ begin
 end;
 
 function ElevationAvailable: Boolean;
+var
+  Output: string;
+  Code: Cardinal;
 begin
-  Result := False;
+  if IsProcessElevated then
+    Exit(False);
+  if not GSudoChecked then
+  begin
+    GSudoFound := (PlatformRunCaptured('sudo', ['-V'], '', 5000, nil, Output, Code) = srOk) and
+      (Code = 0);
+    GSudoChecked := True;
+  end;
+  Result := GSudoFound;
 end;
 
 function ProcessRightsLabel(ARights: TProcessRights): string;
