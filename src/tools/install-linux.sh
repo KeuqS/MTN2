@@ -16,7 +16,7 @@ else
 fi
 
 if [ "$1" = "--uninstall" ]; then
-    rm -f "$bindir/mtn2"
+    rm -f "$bindir/mtn2" "$bindir/mtn2-sdl"
     rm -rf "$prefix"
     echo "MTN2 removed from $prefix"
     exit 0
@@ -32,6 +32,9 @@ rm -rf "$prefix"
 mkdir -p "$prefix"
 cp -a "$here"/. "$prefix"/
 ln -sf "$prefix/mtn2-tui" "$bindir/mtn2"
+if [ -x "$prefix/mtn2-sdl" ]; then
+    ln -sf "$prefix/mtn2-sdl" "$bindir/mtn2-sdl"
+fi
 echo "MTN2 installed in $prefix; run: mtn2"
 case ":$PATH:" in
     *":$bindir:"*) ;;

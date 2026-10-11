@@ -359,7 +359,7 @@ begin
                 QueueFindProgress(OnProgress, List.Count, Dir);
               end;
 
-              Code := FindFirst(TPath.Combine(Dir, '*'), faAnyFile, SR);
+              Code := FindFirst(SafeCombinePath(Dir, '*'), faAnyFile, SR);
               try
                 while Code = 0 do
                 begin
@@ -368,7 +368,7 @@ begin
                   Name := SR.Name;
                   if (Name <> '.') and (Name <> '..') then
                   begin
-                    Full := TPath.Combine(Dir, Name);
+                    Full := SafeCombinePath(Dir, Name);
                     IsDir := (SR.Attr and faDirectory) <> 0;
                     if IsDir then
                     begin

@@ -24,7 +24,7 @@ function StoreDescription(const ADir, AName, ADescription: string): Boolean;
 implementation
 
 uses
-  System.IOUtils;
+  System.IOUtils, uVfsTypes;
 
 const
   cFileName = 'Descript.ion';
@@ -33,7 +33,7 @@ function DescriptionsFilePath(const ADir: string): string;
 var
   Found: string;
 begin
-  Result := TPath.Combine(ADir, cFileName);
+  Result := SafeCombinePath(ADir, cFileName);
   if TFile.Exists(Result) then
     Exit;
   if TDirectory.Exists(ADir) then
@@ -200,7 +200,7 @@ begin
       Text := string.Join(#13#10, Kept.ToArray) + #13#10;
       if not TFile.Exists(Path) then
       begin
-        Path := TPath.Combine(ADir, cFileName);
+        Path := SafeCombinePath(ADir, cFileName);
         Enc := TEncoding.UTF8;
         HasBom := True;
       end;

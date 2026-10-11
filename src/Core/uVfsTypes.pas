@@ -156,6 +156,9 @@ function SafeFileName(const APath: string): string;
 function SafeExtension(const APath: string): string;
 /// <summary>TPath.GetDirectoryName with the same tolerance.</summary>
 function SafeDirectoryName(const APath: string): string;
+/// <summary>TPath.Combine that also accepts a name with control characters
+/// (valid on Linux), where TPath raises.</summary>
+function SafeCombinePath(const ADir, AName: string): string;
 function DriveLetterOf(const APath: string): Char;
 /// <summary>Local paths compare case-insensitively on Windows, exactly
 /// elsewhere.</summary>
@@ -316,6 +319,16 @@ begin
     Result := SameText(A, B);
 end;
 
+function HasControlChars(const S: string): Boolean;
+var
+  C: Char;
+begin
+  for C in S do
+    if Ord(C) < 32 then
+      Exit(True);
+  Result := False;
+end;
+
 function LocalPathKey(const APath: string): string;
 begin
   if PlatformPosixPaths then
@@ -338,7 +351,11 @@ begin
     Exit('');
   if PlatformPosixPaths then
   begin
-    Result := TPath.GetFullPath(P);
+    // TPath.GetFullPath raises on control characters, valid in a Linux name.
+    if HasControlChars(P) then
+      Result := ExpandFileName(P)
+    else
+      Result := TPath.GetFullPath(P);
     if Length(Result) > 1 then
       Result := ExcludeTrailingPathDelimiter(Result);
     Exit;
@@ -507,16 +524,6 @@ begin
   Result := PlatformIsFile(WinApiPath(P));
 end;
 
-function HasControlChars(const S: string): Boolean;
-var
-  C: Char;
-begin
-  for C in S do
-    if Ord(C) < 32 then
-      Exit(True);
-  Result := False;
-end;
-
 function LastPathSeparator(const S: string): Integer;
 begin
   Result := Length(S);
@@ -560,6 +567,20 @@ begin
     Result := Copy(APath, 1, I)
   else
     Result := Copy(APath, 1, I - 1);
+end;
+
+function SafeCombinePath(const ADir, AName: string): string;
+begin
+  if not (HasControlChars(ADir) or HasControlChars(AName)) then
+    Exit(TPath.Combine(ADir, AName));
+  if (ADir = '') or (AName = '') then
+    Exit(ADir + AName);
+  if (AName[1] = '/') or (not PlatformPosixPaths and (AName[1] = PathDelim)) then
+    Exit(AName);
+  if (ADir[Length(ADir)] = '/') or (ADir[Length(ADir)] = PathDelim) then
+    Result := ADir + AName
+  else
+    Result := ADir + PathDelim + AName;
 end;
 
 function DriveLetterOf(const APath: string): Char;
@@ -1394,11 +1415,11 @@ begin
   end;
 
   if not HasArchiveChain(ADirURI) then
-    Exit(PathToFileUri(TPath.Combine(FileUriToPath(ADirURI),
+    Exit(PathToFileUri(SafeCombinePath(FileUriToPath(ADirURI),
       StringReplace(Name, '/', PathDelim, [rfReplaceAll]))));
 
   if not SplitArchiveUri(ADirURI, Base, Segs) then
-    Exit(PathToFileUri(TPath.Combine(FileUriToPath(ADirURI), Name)));
+    Exit(PathToFileUri(SafeCombinePath(FileUriToPath(ADirURI), Name)));
 
   if Length(Segs) = 0 then
   begin

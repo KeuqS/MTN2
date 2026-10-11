@@ -52,11 +52,11 @@ jobs:
       - name: Linux package
         if: ${{ vars.LINUX_BUILD == 'true' }}
         shell: pwsh
-        # The terminal program for Linux (needs the Linux SDK and WSL on the
+        # The terminal and window programs for Linux (needs the Linux SDK and WSL on the
         # runner; enable with the repository variable LINUX_BUILD). The Linux
         # self-updater takes MTN2-<tag>-linux-x64.tar.gz.
         run: |
-          ./src/build-linux.ps1 -Rebuild
+          ./src/build-linux.ps1 -Rebuild -Sdl
           ./src/tests/run-tests-linux.ps1
           ./src/tools/package-linux.ps1 -Version $env:TAG
 

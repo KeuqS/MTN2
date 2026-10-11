@@ -246,14 +246,14 @@ begin
       'Copy verification failed: destination folder missing', PathToFileUri(ADst));
     Exit;
   end;
-  Code := FindFirst(WinApiPath(TPath.Combine(ASrc, '*')), faAnyFile, SR);
+  Code := FindFirst(WinApiPath(SafeCombinePath(ASrc, '*')), faAnyFile, SR);
   try
     while Code = 0 do
     begin
       if (SR.Name <> '.') and (SR.Name <> '..') then
       begin
-        ChildSrc := TPath.Combine(ASrc, SR.Name);
-        ChildDst := TPath.Combine(ADst, SR.Name);
+        ChildSrc := SafeCombinePath(ASrc, SR.Name);
+        ChildDst := SafeCombinePath(ADst, SR.Name);
         if (SR.Attr and faDirectory) <> 0 then
           VerifyCopiedTree(ChildSrc, ChildDst, AError)
         else
@@ -500,7 +500,7 @@ begin
   end
   else if not TDirectory.Exists(WinApiPath(ADst)) then
     TDirectory.CreateDirectory(WinApiPath(ADst));
-  Code := FindFirst(WinApiPath(TPath.Combine(ASrc, '*')), faAnyFile, SR);
+  Code := FindFirst(WinApiPath(SafeCombinePath(ASrc, '*')), faAnyFile, SR);
   try
     while Code = 0 do
     begin
@@ -511,8 +511,8 @@ begin
       end;
       if (SR.Name <> '.') and (SR.Name <> '..') then
       begin
-        ChildSrc := TPath.Combine(ASrc, SR.Name);
-        ChildDst := TPath.Combine(ADst, SR.Name);
+        ChildSrc := SafeCombinePath(ASrc, SR.Name);
+        ChildDst := SafeCombinePath(ADst, SR.Name);
         ChildErr := TVfsError.Ok;
         if (SR.Attr and faDirectory) <> 0 then
           CopyTree(ChildSrc, ChildDst, ACancel, AOnProgress, ADoneBytes, ATotalBytes,
@@ -585,14 +585,14 @@ begin
   end;
   if not TDirectory.Exists(WinApiPath(APath)) then
     Exit;
-  Code := FindFirst(WinApiPath(TPath.Combine(APath, '*')), faAnyFile, SR);
+  Code := FindFirst(WinApiPath(SafeCombinePath(APath, '*')), faAnyFile, SR);
   try
     while Code = 0 do
     begin
       if (SR.Name <> '.') and (SR.Name <> '..') then
       begin
         if (SR.Attr and faDirectory) <> 0 then
-          Inc(Result, EstimateTreeBytes(TPath.Combine(APath, SR.Name)))
+          Inc(Result, EstimateTreeBytes(SafeCombinePath(APath, SR.Name)))
         else
           Inc(Result, SR.Size);
       end;
@@ -617,14 +617,14 @@ begin
   if not TDirectory.Exists(WinApiPath(APath)) then
     Exit(0);
   Result := 1; // APath itself
-  Code := FindFirst(WinApiPath(TPath.Combine(APath, '*')), faAnyFile, SR);
+  Code := FindFirst(WinApiPath(SafeCombinePath(APath, '*')), faAnyFile, SR);
   try
     while Code = 0 do
     begin
       if (SR.Name <> '.') and (SR.Name <> '..') then
       begin
         if (SR.Attr and faDirectory) <> 0 then
-          Inc(Result, EstimateTreeItemCount(TPath.Combine(APath, SR.Name)))
+          Inc(Result, EstimateTreeItemCount(SafeCombinePath(APath, SR.Name)))
         else
           Inc(Result);
       end;
@@ -662,7 +662,7 @@ begin
   try
     if LocalPathIsDirectory(Path) and not PlatformIsLinkNode(Path) then
     begin
-      Code := FindFirst(WinApiPath(TPath.Combine(Path, '*')), faAnyFile, SR);
+      Code := FindFirst(WinApiPath(SafeCombinePath(Path, '*')), faAnyFile, SR);
       try
         while Code = 0 do
         begin
@@ -674,7 +674,7 @@ begin
           end;
           if (SR.Name <> '.') and (SR.Name <> '..') then
           begin
-            Child := TPath.Combine(Path, SR.Name);
+            Child := SafeCombinePath(Path, SR.Name);
             ChildErr := TVfsError.Ok;
             DeleteTree(Child, ACancel, AOnProgress, ADoneItems, ATotalItems, ChildErr);
             if ChildErr.Code <> vecOk then
@@ -788,7 +788,7 @@ begin
           begin
             List := TList<TVfsEntry>.Create;
             try
-              Code := FindFirst(WinApiPath(TPath.Combine(Path, '*')), faAnyFile, SR);
+              Code := FindFirst(WinApiPath(SafeCombinePath(Path, '*')), faAnyFile, SR);
               if PlatformSearchDenied(Code) then
                 Err := TVfsError.Make(vecAccessDenied, 'Access denied', URI)
               else if Code = 0 then
@@ -957,7 +957,7 @@ begin
             begin
               Parent := ResolveLocalDirPath(Parent);
               if Parent <> '' then
-                Path := TPath.Combine(Parent, Leaf);
+                Path := SafeCombinePath(Parent, Leaf);
             end;
             if LocalPathIsDirectory(Path) or LocalPathIsFile(Path) then
               Err := TVfsError.Make(vecAlreadyExists, 'Already exists', URI)

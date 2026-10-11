@@ -15,12 +15,14 @@ type
     [Test] procedure TestPlainPathsFollowTPath;
     [Test] procedure TestControlCharsInTheName;
     [Test] procedure TestControlCharsWithoutExtensionOrFolder;
+    [Test] procedure TestCombineWithControlChars;
+    [Test] procedure TestJoinedUriWithControlChars;
   end;
 
 implementation
 
 uses
-  System.SysUtils, System.IOUtils, uVfsTypes;
+  System.SysUtils, System.IOUtils, uPlatformPaths, uVfsTypes;
 
 const
   cOdd = 'a' + #11 + 'b' + #31 + 'c';
@@ -55,6 +57,28 @@ begin
   Assert.AreEqual('', SafeExtension('/dir/' + cOdd));
   Assert.AreEqual('/', SafeDirectoryName('/' + cOdd));
   Assert.AreEqual('', SafeDirectoryName(cOdd));
+end;
+
+procedure TTestSafePath.TestCombineWithControlChars;
+begin
+  Assert.AreEqual(TPath.Combine('/data', 'x.txt'), SafeCombinePath('/data', 'x.txt'));
+  Assert.AreEqual('/data' + PathDelim + cOdd, SafeCombinePath('/data', cOdd));
+  Assert.AreEqual('/data/' + cOdd, SafeCombinePath('/data/', cOdd));
+  Assert.AreEqual('/abs/' + cOdd, SafeCombinePath('/data', '/abs/' + cOdd));
+end;
+
+procedure TTestSafePath.TestJoinedUriWithControlChars;
+var
+  Uri: string;
+begin
+  // Windows rejects control characters in a path; only Posix keeps them.
+  if not PlatformPosixPaths then
+  begin
+    Assert.Pass;
+    Exit;
+  end;
+  Uri := JoinFileUri(PathToFileUri('/data/work'), cOdd + '.txt');
+  Assert.AreEqual(cOdd + '.txt', SafeFileName(FileUriToPath(Uri)));
 end;
 
 initialization

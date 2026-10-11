@@ -386,7 +386,7 @@ var
     end;
     if not TDirectory.Exists(WinApiPath(APath)) then
       Exit;
-    Code := FindFirst(TPath.Combine(APath, '*'), faAnyFile, SR);
+    Code := FindFirst(SafeCombinePath(APath, '*'), faAnyFile, SR);
     try
       while Code = 0 do
       begin
@@ -396,7 +396,7 @@ var
           begin
             if ACountFolders then
               Inc(AFileCount);
-            Inc(Result, Walk(TPath.Combine(APath, SR.Name)));
+            Inc(Result, Walk(SafeCombinePath(APath, SR.Name)));
           end
           else
           begin
@@ -1665,7 +1665,7 @@ begin
           Exit;
         end;
         Dir := ExtractFilePath(FileUriToPath(DstURI));
-        DstURI := PathToFileUri(TPath.Combine(Dir, NewName));
+        DstURI := PathToFileUri(SafeCombinePath(Dir, NewName));
         if TFile.Exists(WinApiPath(FileUriToPath(DstURI))) or
            TDirectory.Exists(WinApiPath(FileUriToPath(DstURI))) then
         begin

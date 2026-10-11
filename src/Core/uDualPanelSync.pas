@@ -244,7 +244,7 @@ var
   Code: Integer;
   ChildDir, ChildRel: string;
 begin
-  Code := FindFirst(TPath.Combine(ADir, '*'), faAnyFile, SR);
+  Code := FindFirst(SafeCombinePath(ADir, '*'), faAnyFile, SR);
   try
     while Code = 0 do
     begin
@@ -256,11 +256,11 @@ begin
           ChildRel := ARelBase + PathDelim + SR.Name;
         if (SR.Attr and faDirectory) <> 0 then
         begin
-          ChildDir := TPath.Combine(ADir, SR.Name);
+          ChildDir := SafeCombinePath(ADir, SR.Name);
           CollectFiles(ChildDir, ChildRel, APaths);
         end
         else
-          APaths.AddOrSetValue(ChildRel, TPath.Combine(ADir, SR.Name));
+          APaths.AddOrSetValue(ChildRel, SafeCombinePath(ADir, SR.Name));
       end;
       Code := FindNext(SR);
     end;
@@ -320,7 +320,7 @@ begin
     begin
       Rel := Pair.Key;
       SrcPath := Pair.Value;
-      DstPath := TPath.Combine(Dst, Rel);
+      DstPath := SafeCombinePath(Dst, Rel);
       if not TFile.Exists(DstPath) then
         AppendSyncItem(Result, MakeSyncItem(Rel, SrcPath, DstPath, srMissing))
       else if TFile.GetLastWriteTimeUtc(SrcPath) >
@@ -472,9 +472,9 @@ begin
       RightExists := RightMap.TryGetValue(Rel, RightPath);
       HasSnap := SnapMap.TryGetValue(Rel, Snap);
       if not LeftExists then
-        LeftPath := TPath.Combine(Left, Rel);
+        LeftPath := SafeCombinePath(Left, Rel);
       if not RightExists then
-        RightPath := TPath.Combine(Right, Rel);
+        RightPath := SafeCombinePath(Right, Rel);
 
       ClassifyTwoWaySyncPair(Rel, LeftPath, RightPath, LeftExists, RightExists,
         HasSnap, Snap, AByContent, Copies, Conflicts);
