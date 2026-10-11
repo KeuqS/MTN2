@@ -63,7 +63,7 @@ $Control = @(
     'Architecture: amd64',
     'Maintainer: MTN2 <noreply@users.noreply.github.com>',
     'Homepage: https://github.com/Laex/MTN2',
-    'Recommends: 7zip | p7zip-full',
+    'Recommends: 7zip | p7zip-full, chafa',
     'Description: Dual-panel file manager for the terminal',
     ' Modern Terminal Navigator 2: two panels with tabs, viewer, editor,',
     ' terminals, SFTP and archives, drawn inside an ordinary terminal.') -join "`n"

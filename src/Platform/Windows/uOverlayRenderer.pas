@@ -18,7 +18,7 @@ interface
 
 uses
   System.SysUtils, System.Classes, System.Types, System.UITypes, FMX.Graphics,
-  uThemeTypes, uImageInfo;
+  uThemeTypes, uTerminalTypes, uImageInfo;
 
 const
   cOverlayMaxBytes = 32 * 1024 * 1024; // 32 MB cap - generous for one photo
@@ -54,6 +54,8 @@ procedure ClearOverlayPreview;
 function OverlayActive: Boolean;
 /// <summary>URI of the current/last preview request; '' if none.</summary>
 function OverlayCurrentURI: string;
+/// <summary>Writes the preview into character cells; the graphical build draws a bitmap instead, so nothing happens.</summary>
+procedure PaintOverlayCells(var AGrid: TTerminalGrid);
 /// <summary>Draw the current preview (if ready) onto ACanvas, converting
 /// the stored cell bounds to pixels via ACellWidth/ACellHeight.</summary>
 procedure DrawOverlayPreview(ACanvas: TCanvas; ACellWidth, ACellHeight: Single);
@@ -411,6 +413,10 @@ procedure DrawOverlayPreview(ACanvas: TCanvas; ACellWidth, ACellHeight: Single);
 begin
   if Assigned(GHost) then
     GHost.Draw(ACanvas, ACellWidth, ACellHeight);
+end;
+
+procedure PaintOverlayCells(var AGrid: TTerminalGrid);
+begin
 end;
 
 procedure SetOverlayRepaintHandler(AHandler: TThreadProcedure);

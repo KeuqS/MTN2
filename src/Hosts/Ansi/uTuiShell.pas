@@ -137,7 +137,8 @@ uses
   uEditorSearch, uEditorWindow, uBaseConsoleWindow, uPanelColumns, uThemeDrawing,
   uDualPanelDrag, uKeyChord, uDialogHost, uPlatformInfo, uTerminalWindow,
   uDualPanelUiTypes, uToast, uWindowChrome, uConsoleLaunch, uPluginHost,
-  uPluginPanelServices, uPluginServices, uPluginUi, uPluginChrome, uDialogTypes, uVfsTypes;
+  uPluginPanelServices, uPluginServices, uPluginUi, uPluginChrome, uDialogTypes, uVfsTypes,
+  uOverlayRenderer;
 
 const
   cDefaultThemeFallback = 'NDN';
@@ -150,11 +151,16 @@ begin
   FLastClickCol := -1;
   FLastClickRow := -1;
   ReloadKeymap('');
-  // The terminal has no window frame of its own to draw, no pictures and no
-  // file icons.
+  // The terminal has no window frame of its own to draw and no file icons;
+  // pictures come as colored cells.
   GShowTitleBar := True;
   GShowPanelIcons := False;
   GFileDragEnabled := False;
+  SetOverlayRepaintHandler(
+    procedure
+    begin
+      Recompose;
+    end);
 
   FSession := Default(TMtnSession);
   FSession.ConsoleRestartOnExit := True;
@@ -187,6 +193,7 @@ end;
 
 destructor TTuiShell.Destroy;
 begin
+  SetOverlayRepaintHandler(nil);
   FreeAndNil(FUpdateTimer);
   FreeAndNil(FUpdater);
   FreeAndNil(FPeekTimer);
@@ -873,6 +880,7 @@ begin
   SyncHiddenConsoleArea(FCols, FRows);
   FMdi.Paint(FGrid, FCols, FRows);
   FDualPanel.PaintConsoleWindowButtons(FGrid, FCols);
+  PaintOverlayCells(FGrid);
   FDirty := False;
   Result := FGrid;
 end;
