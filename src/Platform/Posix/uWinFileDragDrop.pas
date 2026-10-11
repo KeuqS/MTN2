@@ -1,9 +1,11 @@
 unit uWinFileDragDrop;
 
-{ Clipboard exchange of panel items and drag-out of files (POSIX build). The
-  items travel as the MTN2 text form through the clipboard service (the
-  terminal host offers it to the terminal emulator and keeps a copy of its
-  own); dragging files out to other programs does not exist here. The Windows
+{ Clipboard exchange of panel items and drag-out of files (POSIX build). Local
+  files go to the desktop clipboard through uSystemClipboard, so file managers
+  can paste them; without a helper the items travel as the MTN2 text form
+  through the clipboard service (the terminal host offers it to the terminal
+  emulator and keeps a copy of its own). Dragging files out to other programs
+  does not exist here. The Windows
   build lives in Platform\Windows; each project puts exactly one of the two
   directories on its unit search path. }
 
@@ -36,7 +38,7 @@ procedure ClipboardClearPanelItems;
 implementation
 
 uses
-  System.SysUtils, uClipboardService, uFileClip;
+  System.SysUtils, uClipboardService, uFileClip, uSystemClipboard;
 
 function OleFileDragActive: Boolean;
 begin
@@ -57,8 +59,14 @@ end;
 function ClipboardSetPanelItems(const ALocalPaths, AUris: TArray<string>;
   ACut: Boolean): Boolean;
 begin
-  Result := (Length(AUris) > 0) and
-    TrySetClipboardText(EncodeMtnFileClip(AUris, ACut));
+  if Length(AUris) = 0 then
+    Exit(False);
+  // With a desktop clipboard helper the file list goes there, where other
+  // programs see it too; the terminal's text clipboard would replace it.
+  if (Length(ALocalPaths) = Length(AUris)) and
+     SystemFileClipSet(LocalPathsToFileUris(ALocalPaths), ACut) then
+    Exit(True);
+  Result := TrySetClipboardText(EncodeMtnFileClip(AUris, ACut));
 end;
 
 function ClipboardGetPanelItems(out ALocalPaths, AUris: TArray<string>;
@@ -69,7 +77,10 @@ begin
   SetLength(ALocalPaths, 0);
   SetLength(AUris, 0);
   ACut := False;
-  Result := TryGetClipboardText(Text) and DecodeMtnFileClip(Text, AUris, ACut);
+  if SystemFileClipAvailable then
+    Result := SystemFileClipGet(AUris, ACut)
+  else
+    Result := TryGetClipboardText(Text) and DecodeMtnFileClip(Text, AUris, ACut);
   if Result then
     ALocalPaths := FileUrisToLocalPaths(AUris);
 end;
@@ -84,6 +95,7 @@ end;
 
 procedure ClipboardClearPanelItems;
 begin
+  SystemFileClipClear;
   TrySetClipboardText('');
 end;
 

@@ -84,7 +84,7 @@ implementation
 
 uses
   System.SysUtils, System.IOUtils, System.Diagnostics, Posix.Base, Posix.Dlfcn, Posix.Unistd,
-  Posix.SysStatvfs;
+  Posix.SysStatvfs, uSystemClipboard;
 
 function PlatformRenderLibrary: string;
 begin
@@ -157,7 +157,7 @@ end;
 
 function PlatformClipboardSequence: Cardinal;
 begin
-  Result := 0;
+  Result := SystemFileClipSignature;
 end;
 
 function PlatformSharedLibExt: string;

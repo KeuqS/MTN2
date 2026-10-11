@@ -34,6 +34,7 @@ uses
   TestElevatedSudo in 'TestElevatedSudo.pas',
   TestOpenAsArchive in 'TestOpenAsArchive.pas',
   TestSftpVfs in 'TestSftpVfs.pas',
+  TestSystemFileClipboard in 'TestSystemFileClipboard.pas',
   TestSshConnections in 'TestSshConnections.pas',
   TestUserAssociations in 'TestUserAssociations.pas',
   TestVfsDelete in 'TestVfsDelete.pas',
