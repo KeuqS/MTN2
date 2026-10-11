@@ -40,14 +40,18 @@ Neuerungen in den Versionen – siehe [CHANGELOG.md](CHANGELOG.md).
 - **Updates:** tägliche Prüfung auf neue GitHub-Releases; Download (mit SHA-256-Prüfung), Installation
   und Neustart erfolgen erst nach Bestätigung durch den Benutzer. Menü **≡ → Nach Updates suchen...**.
 
-Derzeit wird Windows x64 unterstützt; POSIX PTY und Builds für macOS/Linux sind in Planung.
+Unterstützt werden Windows x64 (grafische Anwendung) und Linux x86-64: `mtn2-tui` nutzt das gesamte Textterminal,
+bietet dieselben Panels, Viewer, Editor, Konsole und Plugins und funktioniert über SSH sowie in `tmux` (siehe [docs/LINUX.md](docs/LINUX.md)).
+Eine grafische Version für Linux und ein macOS-Build sind in Planung.
 
 ## Installation
 
 Fertige Builds stehen auf der [Releases](https://github.com/Laex/MTN2/releases)-Seite bereit:
 
 - `MTN2-<version>-win64.zip` – Einstellungen und Verlauf werden in `%APPDATA%\MTN2` gespeichert;
-- `MTN2-<version>-win64-portable.zip` – portable Version: alles wird direkt neben `MTN2.exe` abgelegt.
+- `MTN2-<version>-win64-portable.zip` – portable Version: alles wird direkt neben `MTN2.exe` abgelegt;
+- `MTN2-<version>-linux-x64.tar.gz` und `MTN2-<version>-linux-x64.deb` – Version für das Linux-Terminal (`mtn2-tui`):
+  Installation, Abhängigkeiten und Parameter – siehe [docs/LINUX.md](docs/LINUX.md).
 
 Das Archiv einfach in einen beliebigen Ordner entpacken und `MTN2.exe` starten. Danach aktualisiert sich das Programm selbst
 (Menü **≡ → Nach Updates suchen...**). Das Paket enthält `7z.dll` aus [7-Zip](https://www.7-zip.org) (GNU LGPL; Lizenztexte in
@@ -64,10 +68,13 @@ Dev-Builds enthalten die neuesten Änderungen und sind möglicherweise weniger s
 ## Kompilieren
 
 Erforderlich sind RAD Studio 13 (Delphi, `Studio\37.0`) und Windows x64; für das WASM-Plugin `mtn.ws` wird Rust benötigt.
+Die Linux-Version wird unter Windows mit dem Compiler `dcclinux64` erstellt, die Tests werden in WSL ausgeführt.
 
 ```powershell
 ./src/build.ps1 -Config Release -Platform Win64   # bin\win64\MTN2.exe + bin\win64\plugins\
 ./src/tests/run-tests.ps1                          # DUnitX-Regressionstests
+./src/build-linux.ps1                              # bin\linux64\mtn2-tui
+./src/tests/run-tests-linux.ps1                    # dieselben Tests in WSL
 ```
 
 Start: `bin\win64\MTN2.exe [--no-skia] [--fps] [pfad]`. Details unter [docs/BUILDING.md](docs/BUILDING.md).
@@ -76,11 +83,14 @@ Start: `bin\win64\MTN2.exe [--no-skia] [--fps] [pfad]`. Details unter [docs/BUIL
 
 | Pfad | Inhalt |
 |---|---|
-| `src/Core` | Kern: Panels, VFS, ConPTY, Konsole, Editor, Dialoge, Plugin-Host |
+| `src/Core` | Kern: Panels, VFS, Konsole, Editor, Dialoge, Plugin-Host |
+| `src/Platform` | Plattformschicht: `Windows` und `Posix` mit gleichnamigen Modulen |
+| `src/Hosts` | Hosts: `Ansi` – Version für das Textterminal |
 | `src/Forms`, `src/dialogs`, `src/strings`, `src/Assets/themes` | Hauptformular, JSON-Dialoge, Lokalisierung, integrierte Themes |
 | `src/plugins` | Integrierte Plugins (`mtn.7z`, `mtn.tmp`, `mtn.ws`, WASM-Demo) |
 | `src/tests` | DUnitX-Regressionstests nach Gruppen und Test-Runner `run-tests.ps1` |
 | `src/tools` | DialogDesigner, ExportDialogJson, Projektgruppe `Group.groupproj`, Hilfsskripte |
+| `bin/win64`, `bin/linux64` | Build-Ausgabe nach Plattformen |
 | `bin/win64/help` | F1-Hilfe (en/ru/de), wird zusammen mit dem Programm ausgeliefert |
 | `docs` | Entwicklerdokumentation, Screenshots (`docs/images`) |
 
@@ -89,6 +99,7 @@ Start: `bin\win64\MTN2.exe [--no-skia] [--fps] [pfad]`. Details unter [docs/BUIL
 - [SDS.md](docs/SDS.md) – Vollständige Spezifikation: Konzept, Datenstrukturen, APIs, Roadmap.
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md) – Schichten, Datenflüsse und Invarianten.
 - [BUILDING.md](docs/BUILDING.md) – Bauen, Tests, CI/CD.
+- [LINUX.md](docs/LINUX.md) – Version für das Linux-Terminal: Installation, Parameter, Abhängigkeiten.
 - [THEMES.md](docs/THEMES.md) – Theme-Dateiformat und Farbrollen.
 - [HELP.md](docs/HELP.md) – Vollständiger Text der Benutzerhilfe in einer Datei.
 - Plugin-Schnittstellen: [PLUGIN_BOUNDARIES](docs/PLUGIN_BOUNDARIES.md), [PANEL](docs/PANEL_PLUGIN.md),

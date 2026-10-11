@@ -290,7 +290,7 @@ end;
 procedure TPtyLife.Deliver(AEpoch: Integer; const AText: string);
 var
   Queue: Boolean;
-  Self_: TPtyLife;
+  Hold: IInterface;
 begin
   Queue := False;
   FLock.Enter;
@@ -308,11 +308,13 @@ begin
   end;
   if Queue then
   begin
-    Self_ := Self;
+    // The queued call holds a reference: the link must outlive the session
+    // and the reader thread until the main thread has run it.
+    Hold := Self;
     TThread.Queue(nil,
       procedure
       begin
-        Self_.Flush(AEpoch);
+        (Hold as TPtyLife).Flush(AEpoch);
       end);
   end;
 end;
@@ -341,15 +343,17 @@ end;
 
 procedure TPtyLife.NotifyExit(AEpoch: Integer; ACode: Cardinal);
 var
-  Self_: TPtyLife;
+  Hold: IInterface;
 begin
-  Self_ := Self;
+  Hold := Self;
   TThread.Queue(nil,
     procedure
     var
+      Self_: TPtyLife;
       Cb: TConPtyExitEvent;
       Mine: Boolean;
     begin
+      Self_ := Hold as TPtyLife;
       Self_.Flush(AEpoch);
       Cb := nil;
       Mine := False;

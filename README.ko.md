@@ -39,14 +39,18 @@ TrueType 폰트, 유니코드 및 32비트 트루컬러를 지원하는 Delphi F
 - **업데이트:** GitHub 새 릴리스 매일 확인; 다운로드(SHA-256 검증 포함), 설치 및
   재시작은 사용자 확인 후에만 진행됩니다. 메뉴 **≡ → 업데이트 확인...**.
 
-현재 Windows x64를 지원하며, POSIX PTY 및 macOS/Linux 빌드는 향후 지원 예정입니다.
+Windows x64(GUI 애플리케이션) 및 Linux x86-64를 지원합니다: `mtn2-tui`는 전체 텍스트 터미널에서 실행되며,
+동일한 패널, 뷰어, 에디터, 콘솔 및 플러그인을 제공하고 SSH 및 `tmux` 환경에서도 작동합니다([docs/LINUX.md](docs/LINUX.md) 참조).
+Linux용 GUI 버전 및 macOS 빌드는 향후 지원 예정입니다.
 
 ## 설치
 
 빌드된 패키지는 [Releases](https://github.com/Laex/MTN2/releases) 페이지에서 다운로드할 수 있습니다:
 
 - `MTN2-<버전>-win64.zip` – 설정 및 히스토리가 `%APPDATA%\MTN2`에 저장됩니다.
-- `MTN2-<버전>-win64-portable.zip` – 포터블 버전: 모든 데이터가 `MTN2.exe`와 같은 폴더에 저장됩니다.
+- `MTN2-<버전>-win64-portable.zip` – 포터블 버전: 모든 데이터가 `MTN2.exe`와 같은 폴더에 저장됩니다;
+- `MTN2-<버전>-linux-x64.tar.gz` 및 `MTN2-<버전>-linux-x64.deb` – Linux 터미널 버전(`mtn2-tui`):
+  설치 방법, 의존성 및 옵션은 [docs/LINUX.md](docs/LINUX.md)를 참조하십시오.
 
 압축을 임의의 폴더에 풀고 `MTN2.exe`를 실행하기만 하면 됩니다. 이후에는 프로그램이 자체적으로 업데이트됩니다
 (메뉴 **≡ → 업데이트 확인...**). 7z 및 기타 7-Zip 포맷 지원을 위해 [7-Zip](https://www.7-zip.org)의 `7z.dll`이 번들로 포함되어 있습니다(GNU LGPL 라이선스; 라이선스 전문은 `plugins\mtn.7z\license.txt`, 상세 내용은 [THIRD-PARTY.md](THIRD-PARTY.md) 참조). 필요한 경우 `plugins\mtn.7z\`의 DLL을 사용자의 x64 버전으로 교체할 수 있으며, zip 파일은 이 DLL 없이도 열 수 있습니다.
@@ -61,10 +65,13 @@ TrueType 폰트, 유니코드 및 32비트 트루컬러를 지원하는 Delphi F
 ## 빌드 방법
 
 RAD Studio 13(Delphi, `Studio\37.0`) 및 Windows x64가 필요합니다. WASM 플러그인 `mtn.ws` 빌드에는 Rust가 필요합니다.
+Linux 버전은 Windows에서 `dcclinux64` 컴파일러로 크로스 컴파일되며, 테스트는 WSL에서 실행됩니다.
 
 ```powershell
 ./src/build.ps1 -Config Release -Platform Win64   # bin\win64\MTN2.exe + bin\win64\plugins\
 ./src/tests/run-tests.ps1                          # DUnitX 회귀 테스트
+./src/build-linux.ps1                              # bin\linux64\mtn2-tui
+./src/tests/run-tests-linux.ps1                    # WSL에서 동일한 테스트 실행
 ```
 
 실행: `bin\win64\MTN2.exe [--no-skia] [--fps] [경로]`. 상세 내용은 [docs/BUILDING.md](docs/BUILDING.md)를 참조하십시오.
@@ -73,12 +80,15 @@ RAD Studio 13(Delphi, `Studio\37.0`) 및 Windows x64가 필요합니다. WASM �
 
 | 경로 | 내용 |
 |---|---|
-| `src/Core` | 핵심: 패널, VFS, ConPTY, 콘솔, 에디터, 대화 상자, 플러그인 호스트 |
+| `src/Core` | 핵심: 패널, VFS, 콘솔, 에디터, 대화 상자, 플러그인 호스트 |
+| `src/Platform` | 플랫폼 추상화 계층: `Windows` 및 `Posix` 모듈 |
+| `src/Hosts` | 셸 호스트: `Ansi` – 텍스트 터미널 버전 |
 | `src/Forms`, `src/dialogs`, `src/strings`, `src/Assets/themes` | 메인 폼, JSON 대화 상자, 다국어 리소스, 기본 내장 테마 |
 | `src/plugins` | 내장 플러그인 (`mtn.7z`, `mtn.tmp`, `mtn.ws`, WASM 데모) |
 | `src/tests` | 그룹별 DUnitX 회귀 테스트 및 실행 스크립트 `run-tests.ps1` |
 | `src/tools` | DialogDesigner, ExportDialogJson, `Group.groupproj` 프로젝트 그룹, 유틸리티 스크립트 |
-| `bin/win64/help` | F1 도움말 (en/ru/de), 프로그램과 함께 제공 |
+| `bin/win64`, `bin/linux64` | 플랫폼별 빌드 결과물 |
+| `bin/win64/help` | F1 도움말 파일(en/ru/de), 프로그램과 함께 배포 |
 | `docs` | 개발자 문서, 스크린샷 (`docs/images`) |
 
 ## 문서
@@ -86,6 +96,7 @@ RAD Studio 13(Delphi, `Studio\37.0`) 및 Windows x64가 필요합니다. WASM �
 - [SDS.md](docs/SDS.md) – 상세 사양서: 설계 개념, 데이터 구조, API, 로드맵.
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md) – 아키텍처 계층, 데이터 흐름 및 불변식.
 - [BUILDING.md](docs/BUILDING.md) – 빌드 가이드, 테스트, CI/CD.
+- [LINUX.md](docs/LINUX.md) – Linux 터미널 버전: 설치, 실행 옵션, 의존성.
 - [THEMES.md](docs/THEMES.md) – 테마 파일 형식 및 색상 역할 정의.
 - [HELP.md](docs/HELP.md) – 단일 파일 형태의 사용자 도움말 전문.
 - 플러그인 규약: [PLUGIN_BOUNDARIES](docs/PLUGIN_BOUNDARIES.md), [PANEL](docs/PANEL_PLUGIN.md),

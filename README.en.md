@@ -40,14 +40,18 @@ What's new in each version – [CHANGELOG.md](CHANGELOG.md).
 - **Updates:** daily check for new GitHub releases; download (with SHA-256 verification), installation,
   and restart occur only after user confirmation. Menu **≡ → Check for updates...**.
 
-Currently supports Windows x64; POSIX PTY and macOS/Linux builds are planned.
+Windows x64 (GUI application) and Linux x86-64 are supported: `mtn2-tui` runs in a full-screen text terminal,
+featuring the same panels, viewer, editor, console, and plugins, and works over SSH and inside `tmux` (see [docs/LINUX.md](docs/LINUX.md)).
+A GUI version for Linux and a macOS build are planned.
 
 ## Installation
 
 Pre-built binaries are available on the [Releases](https://github.com/Laex/MTN2/releases) page:
 
 - `MTN2-<version>-win64.zip` – settings and history are stored in `%APPDATA%\MTN2`;
-- `MTN2-<version>-win64-portable.zip` – portable edition: everything is stored next to `MTN2.exe`.
+- `MTN2-<version>-win64-portable.zip` – portable edition: everything is stored next to `MTN2.exe`;
+- `MTN2-<version>-linux-x64.tar.gz` and `MTN2-<version>-linux-x64.deb` – Linux terminal version (`mtn2-tui`):
+  installation, dependencies, and options in [docs/LINUX.md](docs/LINUX.md).
 
 Simply extract the archive into any folder and run `MTN2.exe`. The application can then update itself
 (menu **≡ → Check for updates...**). The release includes `7z.dll` from [7-Zip](https://www.7-zip.org) (GNU LGPL; license text in
@@ -64,10 +68,13 @@ Dev builds contain the latest changes and may be less stable.
 ## Building
 
 Requires RAD Studio 13 (Delphi, `Studio\37.0`) and Windows x64; the `mtn.ws` WASM plugin requires Rust.
+The Linux version is cross-compiled from Windows using the `dcclinux64` compiler, with tests run in WSL.
 
 ```powershell
 ./src/build.ps1 -Config Release -Platform Win64   # bin\win64\MTN2.exe + bin\win64\plugins\
-./src/tests/run-tests.ps1                          # DUnitX regression tests
+./src/tests/run-tests.ps1                          # regression tests (DUnitX)
+./src/build-linux.ps1                              # bin\linux64\mtn2-tui
+./src/tests/run-tests-linux.ps1                    # same tests in WSL
 ```
 
 Run: `bin\win64\MTN2.exe [--no-skia] [--fps] [path]`. Details in [docs/BUILDING.md](docs/BUILDING.md).
@@ -76,11 +83,14 @@ Run: `bin\win64\MTN2.exe [--no-skia] [--fps] [path]`. Details in [docs/BUILDING.
 
 | Path | Contents |
 |---|---|
-| `src/Core` | Core engine: panels, VFS, ConPTY, console, editor, dialogs, plugin host |
+| `src/Core` | Core engine: panels, VFS, console, editor, dialogs, plugin host |
+| `src/Platform` | Platform abstraction layer: `Windows` and `Posix` modules |
+| `src/Hosts` | Shell hosts: `Ansi` – text terminal version |
 | `src/Forms`, `src/dialogs`, `src/strings`, `src/Assets/themes` | Main form, JSON dialogs, localization, built-in themes |
 | `src/plugins` | Built-in plugins (`mtn.7z`, `mtn.tmp`, `mtn.ws`, WASM demo) |
 | `src/tests` | DUnitX regression tests by group and test runner `run-tests.ps1` |
 | `src/tools` | DialogDesigner, ExportDialogJson, `Group.groupproj` project group, utility scripts |
+| `bin/win64`, `bin/linux64` | Build output by platform |
 | `bin/win64/help` | F1 help files (en/ru/de), bundled with the application |
 | `docs` | Developer documentation, screenshots (`docs/images`) |
 
@@ -89,6 +99,7 @@ Run: `bin\win64\MTN2.exe [--no-skia] [--fps] [path]`. Details in [docs/BUILDING.
 - [SDS.md](docs/SDS.md) – full specification: concept, data structures, API, roadmap.
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md) – layers, data flows, and invariants.
 - [BUILDING.md](docs/BUILDING.md) – build guide, tests, CI/CD.
+- [LINUX.md](docs/LINUX.md) – Linux terminal edition: installation, options, dependencies.
 - [THEMES.md](docs/THEMES.md) – theme file format and color roles.
 - [HELP.md](docs/HELP.md) – complete user guide in a single file.
 - Plugin contracts: [PLUGIN_BOUNDARIES](docs/PLUGIN_BOUNDARIES.md), [PANEL](docs/PANEL_PLUGIN.md),

@@ -17,6 +17,7 @@ type
     [Test] procedure TestResizeReachesTheShell;
     [Test] procedure TestTerminateEndsARunningCommand;
     [Test] procedure TestUtf8SplitAcrossChunks;
+    [Test] procedure TestQueuedCallbacksSurviveASessionFreedAfterExit;
   end;
 
 implementation
@@ -160,6 +161,34 @@ begin
   finally
     S.Free;
   end;
+end;
+
+procedure TTestPosixPty.TestQueuedCallbacksSurviveASessionFreedAfterExit;
+var
+  S: TConPtySession;
+  Round, I: Integer;
+begin
+  if not PlatformPosixPaths then
+  begin
+    Assert.Pass('POSIX only');
+    Exit;
+  end;
+  for Round := 1 to 6 do
+  begin
+    S := TConPtySession.Create;
+    try
+      Assert.IsTrue(S.StartShell('', '/tmp', 80, 24), 'the shell starts: ' + S.LastError);
+      S.WriteInput('exit'#13);
+      // The reader thread queues its last calls while nothing pumps the queue;
+      // the session is gone before the main thread runs them.
+      Sleep(300);
+    finally
+      S.Free;
+    end;
+    for I := 1 to 5 do
+      CheckSynchronize(10);
+  end;
+  Assert.Pass('queued calls ran against released sessions');
 end;
 
 initialization

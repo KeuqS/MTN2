@@ -24,14 +24,16 @@
 - **插件系统：** 原生 DLL 与 WebAssembly（基于 Wasmtime）—— 支持自定义 VFS 方案及专属面板、菜单项、按键绑定、消息总线。已定义对话框、覆盖层与状态栏的插件协议，目前由主程序内部使用——详见 [PLUGIN_BOUNDARIES](docs/PLUGIN_BOUNDARIES.md)。
 - **自动更新：** 每日自动检查 GitHub 上的新版本；下载（包含 SHA-256 校验）、安装及重启均需用户确认。菜单入口：**≡ → 检查更新...**。
 
-目前支持 Windows x64；POSIX PTY 以及 macOS/Linux 版本已在规划中。
+支持 Windows x64（图形界面程序）与 Linux x86-64：`mtn2-tui` 运行在全屏文本终端中，拥有完全相同的面板、查看器、编辑器、控制台与插件，支持 SSH 远程连接与 `tmux`（参见 [docs/LINUX.md](docs/LINUX.md)）。Linux 图形界面版本与 macOS 构建已在规划中。
 
 ## 安装指南
 
 预编译版本可在 [Releases](https://github.com/Laex/MTN2/releases) 页面下载：
 
 - `MTN2-<版本>-win64.zip` —— 配置和历史记录保存在 `%APPDATA%\MTN2`；
-- `MTN2-<版本>-win64-portable.zip` —— 便携版：所有内容均存放在 `MTN2.exe` 同级目录下。
+- `MTN2-<版本>-win64-portable.zip` —— 便携版：所有内容均存放在 `MTN2.exe` 同级目录下；
+- `MTN2-<版本>-linux-x64.tar.gz` 与 `MTN2-<版本>-linux-x64.deb` —— Linux 终端版本（`mtn2-tui`）：
+  安装指南、依赖项与参数说明详见 [docs/LINUX.md](docs/LINUX.md)。
 
 只需解压至任意文件夹并运行 `MTN2.exe` 即可。之后程序支持自动更新（菜单 **≡ → 检查更新...**）。发布包中包含来自 [7-Zip](https://www.7-zip.org) 的 `7z.dll`（GNU LGPL 许可；许可证文本位于 `plugins\mtn.7z\license.txt`，详情参阅 [THIRD-PARTY.md](THIRD-PARTY.md)），用于打开 7z 及其他 7-Zip 支持的格式。可在 `plugins\mtn.7z\` 中替换为您自己的 x64 版本；zip 格式无需此 DLL 即可原生打开。
 
@@ -42,10 +44,13 @@
 ## 编译源码
 
 需要 RAD Studio 13（Delphi，`Studio\37.0`）及 Windows x64；编译 WASM 插件 `mtn.ws` 需要 Rust。
+Linux 版本在 Windows 环境下通过 `dcclinux64` 编译器进行交叉编译，其测试套件在 WSL 中运行。
 
 ```powershell
 ./src/build.ps1 -Config Release -Platform Win64   # bin\win64\MTN2.exe + bin\win64\plugins\
 ./src/tests/run-tests.ps1                          # DUnitX 回归测试
+./src/build-linux.ps1                              # bin\linux64\mtn2-tui
+./src/tests/run-tests-linux.ps1                    # 在 WSL 中运行相同测试
 ```
 
 运行：`bin\win64\MTN2.exe [--no-skia] [--fps] [路径]`。详细说明请参阅 [docs/BUILDING.md](docs/BUILDING.md)。
@@ -54,11 +59,14 @@
 
 | 路径 | 内容说明 |
 |---|---|
-| `src/Core` | 核心引擎：面板、VFS、ConPTY、控制台、编辑器、对话框、插件宿主 |
+| `src/Core` | 核心引擎：面板、VFS、控制台、编辑器、对话框、插件宿主 |
+| `src/Platform` | 平台适配层：包含同名模块的 `Windows` 与 `Posix` |
+| `src/Hosts` | 外壳宿主：`Ansi` – 文本终端版本 |
 | `src/Forms`, `src/dialogs`, `src/strings`, `src/Assets/themes` | 主窗体、JSON 对话框、多语言本地化、内置主题 |
 | `src/plugins` | 内置插件（`mtn.7z`、`mtn.tmp`、`mtn.ws`、WASM 演示） |
 | `src/tests` | 按组划分的 DUnitX 回归测试及运行脚本 `run-tests.ps1` |
 | `src/tools` | DialogDesigner、ExportDialogJson、`Group.groupproj` 项目组、工具脚本 |
+| `bin/win64`, `bin/linux64` | 各平台构建输出目录 |
 | `bin/win64/help` | F1 帮助文档（en/ru/de），随程序一同发布 |
 | `docs` | 开发者文档、截图（`docs/images`） |
 
@@ -67,10 +75,11 @@
 - [SDS.md](docs/SDS.md) – 完整软件规格说明书：理念、数据结构、API、路线图。
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md) – 架构分层、数据流及系统不变量。
 - [BUILDING.md](docs/BUILDING.md) – 构建指南、测试、CI/CD。
+- [LINUX.md](docs/LINUX.md) – Linux 终端版本：安装、运行参数与依赖说明。
 - [THEMES.md](docs/THEMES.md) – 主题文件格式与颜色角色定义。
 - [HELP.md](docs/HELP.md) – 单文件完整用户帮助手册。
 - 插件接口规范：[PLUGIN_BOUNDARIES](docs/PLUGIN_BOUNDARIES.md)、[PANEL](docs/PANEL_PLUGIN.md)、
-  [DIALOG](docs/DIALOG_PLUGIN.md)、[INPUT](docs/INPUT_PLUGIN.md)、[OVERLAY](docs/OVERLAY_PLUGIN.md)、
+  [DIALOG](docs/DIALOG_PLUGIN.md)、[INPUT](docs/INPUT_PLUGIN.md), [OVERLAY](docs/OVERLAY_PLUGIN.md)、
   [STATUS](docs/STATUS_PLUGIN.md)、[TEXTAREA](docs/TEXTAREA_PLUGIN.md)、[TOOLBAR](docs/TOOLBAR_PLUGIN.md)、
   [UI_PRIMITIVES](docs/UI_PRIMITIVES.md)。
 
