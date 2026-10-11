@@ -66,11 +66,11 @@ Dev builds contain the latest changes and may be less stable.
 Requires RAD Studio 13 (Delphi, `Studio\37.0`) and Windows x64; the `mtn.ws` WASM plugin requires Rust.
 
 ```powershell
-./src/build.ps1 -Config Release -Platform Win64   # bin\MTN2.exe + bin\plugins\
+./src/build.ps1 -Config Release -Platform Win64   # bin\win64\MTN2.exe + bin\win64\plugins\
 ./src/tests/run-tests.ps1                          # DUnitX regression tests
 ```
 
-Run: `bin\MTN2.exe [--no-skia] [--fps] [path]`. Details in [docs/BUILDING.md](docs/BUILDING.md).
+Run: `bin\win64\MTN2.exe [--no-skia] [--fps] [path]`. Details in [docs/BUILDING.md](docs/BUILDING.md).
 
 ## Repository Structure
 
@@ -81,7 +81,7 @@ Run: `bin\MTN2.exe [--no-skia] [--fps] [path]`. Details in [docs/BUILDING.md](do
 | `src/plugins` | Built-in plugins (`mtn.7z`, `mtn.tmp`, `mtn.ws`, WASM demo) |
 | `src/tests` | DUnitX regression tests by group and test runner `run-tests.ps1` |
 | `src/tools` | DialogDesigner, ExportDialogJson, `Group.groupproj` project group, utility scripts |
-| `bin/help` | F1 help files (en/ru/de), bundled with the application |
+| `bin/win64/help` | F1 help files (en/ru/de), bundled with the application |
 | `docs` | Developer documentation, screenshots (`docs/images`) |
 
 ## Documentation
@@ -104,7 +104,7 @@ MTN2 was developed with the assistance of AI coding assistants, including in-hou
 - Roadmap tracking and task planning;
 - Most source code comments;
 - DUnitX regression tests (`src/tests`);
-- User-facing text documentation: F1 help (`bin/help`), [CHANGELOG.md](CHANGELOG.md), and release notes.
+- User-facing text documentation: F1 help (`bin/win64/help`), [CHANGELOG.md](CHANGELOG.md), and release notes.
 
 ## License
 

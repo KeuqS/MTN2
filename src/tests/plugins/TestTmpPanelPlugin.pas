@@ -1,6 +1,6 @@
 unit TestTmpPanelPlugin;
 
-{ Loads TmpPanelPlugin.dll, copies a real file onto tmp:///, lists it. }
+{ Loads the TmpPanelPlugin library, copies a real file onto tmp:///, lists it. }
 
 interface
 
@@ -18,7 +18,7 @@ implementation
 
 uses
   System.SysUtils, System.Classes, System.IOUtils, System.SyncObjs, System.TypInfo,
-  Winapi.Windows,
+  uPlatformInfo,
   uVfsTypes,
   uTextEncoding,
   uVfsRegistry,
@@ -54,11 +54,11 @@ begin
         Err := AListErr;
         Ev.SetEvent;
       end);
-    Tick := GetTickCount;
+    Tick := TThread.GetTickCount;
     while Ev.WaitFor(50) <> wrSignaled do
     begin
       CheckSynchronize;
-      if GetTickCount - Tick > 15000 then
+      if TThread.GetTickCount - Tick > 15000 then
         raise Exception.Create('ListDirectoryAsync timed out');
     end;
     CheckSynchronize;
@@ -86,11 +86,11 @@ begin
         Err := ACopyErr;
         Ev.SetEvent;
       end);
-    Tick := GetTickCount;
+    Tick := TThread.GetTickCount;
     while Ev.WaitFor(50) <> wrSignaled do
     begin
       CheckSynchronize;
-      if GetTickCount - Tick > 15000 then
+      if TThread.GetTickCount - Tick > 15000 then
         raise Exception.Create('CopyAsync timed out');
     end;
     CheckSynchronize;
@@ -119,11 +119,11 @@ begin
         Err := ADelErr;
         Ev.SetEvent;
       end);
-    Tick := GetTickCount;
+    Tick := TThread.GetTickCount;
     while Ev.WaitFor(50) <> wrSignaled do
     begin
       CheckSynchronize;
-      if GetTickCount - Tick > 15000 then
+      if TThread.GetTickCount - Tick > 15000 then
         raise Exception.Create('DeleteAsync timed out');
     end;
     CheckSynchronize;
@@ -141,7 +141,7 @@ var
 begin
   DestDir := TPath.Combine(APluginsRoot, 'mtn.tmp');
   TDirectory.CreateDirectory(DestDir);
-  TFile.Copy(APluginDll, TPath.Combine(DestDir, 'TmpPanelPlugin.dll'), True);
+  TFile.Copy(APluginDll, TPath.Combine(DestDir, PlatformSharedLibName('TmpPanelPlugin')), True);
   TFile.WriteAllText(TPath.Combine(DestDir, 'plugin.json'),
     '{"id":"mtn.tmp","name":"Temporary panel","version":"0.1.0","abi":1}', TEncoding.UTF8);
 end;
@@ -158,9 +158,9 @@ var
 
 procedure TTestTmpPanelPlugin.Run;
 begin
-  PluginDll := TPath.Combine(ExtractFilePath(ParamStr(0)), 'TmpPanelPlugin.dll');
+  PluginDll := TPath.Combine(ExtractFilePath(ParamStr(0)), PlatformSharedLibName('TmpPanelPlugin'));
   if not TFile.Exists(PluginDll) then
-    raise Exception.Create('TmpPanelPlugin.dll not found: ' + PluginDll);
+    raise Exception.Create('The TmpPanelPlugin library not found: ' + PluginDll);
 
   WorkDir := TPath.Combine(TPath.GetTempPath, 'mtn2-tmp-plugin');
   TDirectory.CreateDirectory(WorkDir);

@@ -25,9 +25,6 @@ vfs/TestSevenZipUri            # 7z URIs of Windows paths
 panels/TestDrivePopup          # drive letters
 panels/TestShellIcons          # Windows shell icons in a FireMonkey bitmap
 plugins/TestSamplePlugins      # plugins are Windows DLLs
-plugins/TestSevenZipOpen
-plugins/TestSevenZipPlugin
-plugins/TestTmpPanelPlugin
 plugins/TestWasmHost
 plugins/TestWorkspacePlugin
 shell/TestCdDirQuote           # cmd.exe and PowerShell sessions

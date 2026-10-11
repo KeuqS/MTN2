@@ -22,7 +22,7 @@
 
 ```powershell
 ./samples/build-samples.ps1            # собрать всё, что позволяет инструментарий
-./samples/build-samples.ps1 -Install   # и поставить в bin\plugins
+./samples/build-samples.ps1 -Install   # и поставить в bin\win64\plugins
 ./samples/build-samples.ps1 -Only mtn.demo.go,mtn.demo.rs
 ```
 

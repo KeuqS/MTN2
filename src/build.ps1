@@ -63,7 +63,7 @@ cmd /c $Cmd
 if ($LASTEXITCODE -ne 0) { throw "msbuild failed with $LASTEXITCODE" }
 
 $ExeCandidates = @(
-    (Join-Path $PSScriptRoot "..\bin\MTN2.exe"),
+    (Join-Path $PSScriptRoot "..\bin\win64\MTN2.exe"),
     (Join-Path $PSScriptRoot "$Platform\$Config\MTN2.exe")
 )
 $Exe = $ExeCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
@@ -94,7 +94,7 @@ Get-ChildItem -Path $PluginsSrc -Directory | ForEach-Object {
 
     Get-ChildItem -Path $Src -Filter '*.dpr' -File -ErrorAction SilentlyContinue | ForEach-Object {
         $PluginCmd = @"
-call "$RsVars" && dcc64 -B $PluginSwitches -U"$CoreDir;$Src" -N"$PluginDcu" -E"$Dest" -NSSystem;System.Win;Winapi;System.IOUtils "$($_.FullName)"
+call "$RsVars" && dcc64 -B $PluginSwitches -U"$CoreDir;$Src;$Src\Windows" -N"$PluginDcu" -E"$Dest" -NSSystem;System.Win;Winapi;System.IOUtils "$($_.FullName)"
 "@
         cmd /c $PluginCmd
         if ($LASTEXITCODE -ne 0) { throw "$Name compile failed: $LASTEXITCODE ($($_.Name))" }

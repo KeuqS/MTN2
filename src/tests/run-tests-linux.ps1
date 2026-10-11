@@ -40,6 +40,26 @@ foreach ($Line in Get-Content (Join-Path $Tests 'linux-excluded.txt')) {
 
 $Libs = "$(Join-Path $Studio 'lib\linux64\release');$Sdk\usr\lib\x86_64-linux-gnu;$Sdk\lib\x86_64-linux-gnu;$Sdk\usr\lib\gcc\x86_64-linux-gnu\13"
 $Failed = @()
+
+# Native plugin libraries the plugin tests load from the runner's folder.
+function Build-PluginLibrary([string]$Dpr, [string]$Units) {
+    $Dcu = Join-Path $Out 'obj\plugin-libs'
+    New-Item -ItemType Directory -Force $Dcu | Out-Null
+    $Result = & (Join-Path $Studio 'bin\dcclinux64.exe') "--syslibroot:$Sdk" "--libpath:$Libs" '--linker-option:-lstdc++' `
+        "-U$Units" "-N0$Dcu" "-E$Exe" $Dpr 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        $Result | Where-Object { $_ -match 'Error|Fatal' } | Select-Object -First 8 | ForEach-Object { Write-Host "        $_" }
+        throw "cannot build $Dpr"
+    }
+}
+if (-not $Group -or $Group -contains 'plugins') {
+    Build-PluginLibrary (Join-Path $Tests 'plugins\SamplePlugin.dpr') "$Src\Core;$Src\Platform\Posix"
+    Build-PluginLibrary (Join-Path $Src 'plugins\mtn.7z\SevenZipPlugin.dpr') "$Src\Core;$Src\Platform\Posix;$Src\plugins\mtn.7z;$Src\plugins\mtn.7z\Posix"
+    Build-PluginLibrary (Join-Path $Src 'plugins\mtn.tmp\TmpPanelPlugin.dpr') "$Src\Core;$Src\Platform\Posix;$Src\plugins\mtn.tmp"
+    & (Join-Path $Src 'tools\fetch-wasmtime.ps1') -Linux | Out-Null
+}
+$WasmtimeLib = Join-Path $Src 'tools\wasmtime\linux64\libwasmtime.so'
+
 foreach ($Dir in Get-ChildItem $Tests -Directory) {
     if ($Dir.Name -in 'common', 'dcu') { continue }
     if ($Group -and $Group -notcontains $Dir.Name) { continue }
@@ -55,7 +75,7 @@ foreach ($Dir in Get-ChildItem $Tests -Directory) {
         "{`$R '$Src\MTN2Tui.dres'}", '', 'uses', '  uTestRunner,',
         (($Fixtures | ForEach-Object { "  $_" }) -join ",`n") + ';', '', 'begin', '  RunRegisteredTests;', 'end.') |
         Set-Content $Dpr -Encoding UTF8
-    $Units = "$Src\Core;$Src\Platform\Posix;$Src\Hosts\Ansi;$Src\tests\common;$($Dir.FullName);$Studio\source\DunitX"
+    $Units = "$Src\Core;$Src\Platform\Posix;$Src\Hosts\Ansi;$Src\plugins\mtn.7z;$Src\plugins\mtn.7z\Posix;$Src\plugins\mtn.tmp;$Src\tests\common;$($Dir.FullName);$Studio\source\DunitX"
     $Dcu = Join-Path $Out "obj\$($Dir.Name)"
     New-Item -ItemType Directory -Force $Dcu | Out-Null
     $Result = & (Join-Path $Studio 'bin\dcclinux64.exe') "--syslibroot:$Sdk" "--libpath:$Libs" '--linker-option:-lstdc++' `
@@ -70,7 +90,8 @@ foreach ($Dir in Get-ChildItem $Tests -Directory) {
     $WslDir = '/mnt/' + $Dir.FullName.Substring(0, 1).ToLower() + $Dir.FullName.Substring(2).Replace('\', '/')
     $Xml = "$Exe\$Name.xml"
     Remove-Item $Xml -ErrorAction SilentlyContinue
-    $Log = & wsl -d $Distro -- bash -c "cd '$WslDir' && timeout $TimeoutSec '$WslOut/$Name' --hidebanner --consolemode:Quiet --exitbehavior:Continue --exclude:Manual,WindowsOnly --xmlfile:'$WslOut/$Name.xml' 2>&1"
+    $WslWasmtime = if (Test-Path $WasmtimeLib) { '/mnt/' + $WasmtimeLib.Substring(0, 1).ToLower() + $WasmtimeLib.Substring(2).Replace('\', '/') } else { '' }
+    $Log = & wsl -d $Distro -- bash -c "cd '$WslDir' && MTN2_WASMTIME_DLL='$WslWasmtime' timeout $TimeoutSec '$WslOut/$Name' --hidebanner --consolemode:Quiet --exitbehavior:Continue --exclude:Manual,WindowsOnly --xmlfile:'$WslOut/$Name.xml' 2>&1"
     $Code = $LASTEXITCODE
     $Counts = ''
     if (Test-Path $Xml) {

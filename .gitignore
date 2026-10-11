@@ -52,8 +52,10 @@ src/MTN2Tui.index.txt
 
 # Project build outputs (see MTN2.dproj: DCC_ExeOutput / DCC_DcuOutput)
 /bin/*
+!/bin/win64/
+/bin/win64/*
 # F1 help topics are sources, not build output
-!/bin/help/
+!/bin/win64/help/
 /dcu/
 src/dcu/
 src/tools/dcu/

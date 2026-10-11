@@ -66,11 +66,11 @@ Dev-сборки содержат свежие изменения и могут 
 Нужны RAD Studio 13 (Delphi, `Studio\37.0`) и Windows x64; для WASM-плагина `mtn.ws` – Rust.
 
 ```powershell
-./src/build.ps1 -Config Release -Platform Win64   # bin\MTN2.exe + bin\plugins\
+./src/build.ps1 -Config Release -Platform Win64   # bin\win64\MTN2.exe + bin\win64\plugins\
 ./src/tests/run-tests.ps1                          # регрессионные тесты (DUnitX)
 ```
 
-Запуск: `bin\MTN2.exe [--no-skia] [--fps] [путь]`. Подробности – в [docs/BUILDING.md](docs/BUILDING.md).
+Запуск: `bin\win64\MTN2.exe [--no-skia] [--fps] [путь]`. Подробности – в [docs/BUILDING.md](docs/BUILDING.md).
 
 ## Структура репозитория
 
@@ -81,7 +81,7 @@ Dev-сборки содержат свежие изменения и могут 
 | `src/plugins` | встроенные плагины (`mtn.7z`, `mtn.tmp`, `mtn.ws`, WASM-демо) |
 | `src/tests` | регрессионные тесты DUnitX по группам и раннер `run-tests.ps1` |
 | `src/tools` | DialogDesigner, ExportDialogJson, группа проектов `Group.groupproj`, служебные скрипты |
-| `bin/help` | справка F1 (en/ru/de), поставляется вместе с программой |
+| `bin/win64/help` | справка F1 (en/ru/de), поставляется вместе с программой |
 | `docs` | документация разработчика, скриншоты (`docs/images`) |
 
 ## Документация
@@ -105,7 +105,7 @@ Dev-сборки содержат свежие изменения и могут 
 - отслеживание дорожной карты и планов работ;
 - большинство комментариев в коде;
 - регрессионные тесты на DUnitX (`src/tests`);
-- выходная текстовая документация: справка F1 (`bin/help`), [CHANGELOG.md](CHANGELOG.md), описания выпусков.
+- выходная текстовая документация: справка F1 (`bin/win64/help`), [CHANGELOG.md](CHANGELOG.md), описания выпусков.
 
 ## Лицензия
 

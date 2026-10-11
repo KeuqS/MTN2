@@ -5,7 +5,7 @@
 Требуется RAD Studio 13 (`Studio\37.0`), Windows x64. Опционально – Rust (`cargo`) для плагина `mtn.ws`.
 
 ```powershell
-./src/build.ps1 -Config Release -Platform Win64   # -> bin\MTN2.exe + bin\plugins\
+./src/build.ps1 -Config Release -Platform Win64   # -> bin\win64\MTN2.exe + bin\win64\plugins\
 ./src/tests/run-tests.ps1                         # регрессионные тесты (DUnitX, dcc64)
 ./src/tools/package-release.ps1 -Version v0.3.0   # -> dist\MTN2-v0.3.0-win64.zip + -win64-portable.zip
 ./src/tools/check-release.ps1 -Version v0.3.0     # распаковать оба и прогнать MTN2.exe --self-check
@@ -20,7 +20,7 @@
 сравнивает автообновление. Без параметра берётся версия из `MTN2.dproj`; релизная сборка передаёт тег.
 
 `wasmtime.dll` скачивается `src/tools/fetch-wasmtime.ps1` (копия хранится в папке кэша: `MTN2_CACHE`, а на раннере GitHub Actions – в его tool cache; там же лежит папка `target` Rust-плагина, чтобы чистый `checkout` не стирал их); `7z.dll` (x64) берётся из установленного 7-Zip
-или из `MTN2_7Z_DLL`, лежит в `bin\plugins\mtn.7z\` и входит в пакеты вместе с текстом лицензии
+или из `MTN2_7Z_DLL`, лежит в `bin\win64\plugins\mtn.7z\` и входит в пакеты вместе с текстом лицензии
 (`src/plugins/mtn.7z/7-Zip-license.txt` -> `plugins\mtn.7z\license.txt`) и `THIRD-PARTY.md`; `package-release.ps1 -Require7z`
 останавливает упаковку, если её нет.
 
@@ -28,7 +28,7 @@
 Ресурсы `src/MTN2.dres` (диалоги, строки, клавиши, меню) в git не хранятся – их собирает `build.ps1`
 (и `run-tests.ps1` для тестов); перед первой сборкой из IDE запустите `build.ps1` один раз.
 
-Запуск: `bin\MTN2.exe [--no-skia] [--fps] [путь]`. Ключи (`--no-skia`, `--fps` – кадры и время кадра в заголовке, путь новой вкладкой, служебные `--wait-pid` и `--self-check`) – [ARCHITECTURE.md](ARCHITECTURE.md) §10.
+Запуск: `bin\win64\MTN2.exe [--no-skia] [--fps] [путь]`. Ключи (`--no-skia`, `--fps` – кадры и время кадра в заголовке, путь новой вкладкой, служебные `--wait-pid` и `--self-check`) – [ARCHITECTURE.md](ARCHITECTURE.md) §10.
 
 ## Сборка под Linux
 
@@ -38,7 +38,8 @@
 `Documents\Embarcadero\Studio.0\PlatformSDKs\Linux64.sdk`. Запускать и проверять – в WSL.
 
 ```powershell
-./src/build-linux.ps1                 # -> bin\linux64\mtn2-tui
+./src/build-linux.ps1                 # -> bin\linux64\mtn2-tui + plugins\<id>\lib*.so
+./src/build-linux.ps1 -NoPlugins      # только программа, без плагинов (.so) и libwasmtime.so
 ./src/build-linux.ps1 -Dump           # собрать и нарисовать один экран текстом в WSL
 ./src/tests/run-tests-linux.ps1       # те же тестовые группы, собранные под Linux64 и запущенные в WSL
 ```

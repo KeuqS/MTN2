@@ -8,7 +8,7 @@ interface
 uses
   System.SysUtils, System.Classes, System.JSON, System.Generics.Collections,
   System.DateUtils, System.IOUtils,
-  uSevenZipApi, uPluginHostAbi;
+  uSevenZipApi, uPluginHostAbi, uPlatformPaths;
 
 function ParseSevenZipUri(const AURI: string; out AArchivePath, AInnerPath: string): Boolean;
 function SevenZipListToJson(const AArchivePath, AInnerPath: string;
@@ -99,6 +99,10 @@ begin
   Rest := Copy(S, P + 3, MaxInt);
   while (Length(Rest) > 0) and (Rest[1] = '/') do
     Delete(Rest, 1, 1);
+  // The slash after the authority belongs to a POSIX path; a Windows path
+  // starts at its drive letter.
+  if PlatformPosixPaths then
+    Rest := '/' + Rest;
   P := Pos('!/', Rest);
   if P <= 0 then
   begin

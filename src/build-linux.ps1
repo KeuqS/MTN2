@@ -6,9 +6,14 @@
 #   ./src/build-linux.ps1                build bin\linux64\mtn2-tui
 #   ./src/build-linux.ps1 -Rebuild       compile everything
 #   ./src/build-linux.ps1 -Dump          build, then draw one screen as text in WSL
+#   ./src/build-linux.ps1 -NoPlugins     only the program
+#
+# Native plugins become lib<Name>.so in bin\linux64\plugins\<id> with their manifests;
+# libwasmtime.so (WASM plugins) is fetched next to the program.
 param(
     [switch]$Rebuild,
     [switch]$Dump,
+    [switch]$NoPlugins,
     [string]$Distro = 'Ubuntu-24.04',
     [string]$Sdk = ''
 )
@@ -40,6 +45,34 @@ try {
     Write-Host "OK: $OutDir\mtn2-tui"
 } finally {
     Pop-Location
+}
+
+$Help = Join-Path $Root 'bin\win64\help'
+if (Test-Path $Help) { Copy-Item $Help $OutDir -Recurse -Force }
+
+if (-not $NoPlugins) {
+    $PluginsOut = Join-Path $OutDir 'plugins'
+    $PluginDcu = Join-Path $Root 'dcu\linux64-plugins'
+    New-Item -ItemType Directory -Force $PluginsOut, $PluginDcu | Out-Null
+    foreach ($Plugin in Get-ChildItem (Join-Path $Src 'plugins') -Directory) {
+        $Dest = Join-Path $PluginsOut $Plugin.Name
+        New-Item -ItemType Directory -Force $Dest | Out-Null
+        foreach ($Dpr in Get-ChildItem $Plugin.FullName -Filter '*.dpr' -File) {
+            $Units = "$Src\Core;$Src\Platform\Posix;$($Plugin.FullName);$($Plugin.FullName)\Posix"
+            $Output = & (Join-Path $Studio 'bin\dcclinux64.exe') "--syslibroot:$Sdk" "--libpath:$Libs" '--linker-option:-lstdc++' `
+                "-U$Units" "-N0$PluginDcu" "-E$Dest" '-$D-' '-$O+' $Dpr.FullName 2>&1
+            if ($LASTEXITCODE -ne 0) {
+                $Output | Where-Object { $_ -match 'Error|Fatal' } | ForEach-Object { Write-Host $_ }
+                throw "$($Plugin.Name): dcclinux64 failed with $LASTEXITCODE"
+            }
+            Write-Host "OK: $($Plugin.Name)\lib$($Dpr.BaseName).so"
+        }
+        Get-ChildItem $Plugin.FullName -File | Where-Object { $_.Extension -in '.json', '.wat', '.wasm', '.md', '.txt' } |
+            ForEach-Object { Copy-Item $_.FullName (Join-Path $Dest $_.Name) -Force }
+    }
+    & (Join-Path $Src 'tools\fetch-wasmtime.ps1') -Linux | Out-Null
+    $Wasmtime = Join-Path $Src 'tools\wasmtime\linux64\libwasmtime.so'
+    if (Test-Path $Wasmtime) { Copy-Item $Wasmtime $OutDir -Force }
 }
 
 if ($Dump) {

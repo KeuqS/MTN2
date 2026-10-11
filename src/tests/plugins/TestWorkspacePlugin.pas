@@ -20,7 +20,6 @@ implementation
 uses
   uTestPaths,
   System.SysUtils, System.Classes, System.IOUtils, System.SyncObjs, System.TypInfo,
-  Winapi.Windows,
   uVfsTypes,
   uTextEncoding,
   uVfsRegistry,
@@ -66,11 +65,11 @@ begin
         Err := AListErr;
         Ev.SetEvent;
       end);
-    Tick := GetTickCount;
+    Tick := TThread.GetTickCount;
     while Ev.WaitFor(50) <> wrSignaled do
     begin
       CheckSynchronize;
-      if GetTickCount - Tick > 15000 then
+      if TThread.GetTickCount - Tick > 15000 then
         raise Exception.Create('ListDirectoryAsync timed out');
     end;
     CheckSynchronize;
@@ -98,11 +97,11 @@ begin
         Err := ACopyErr;
         Ev.SetEvent;
       end);
-    Tick := GetTickCount;
+    Tick := TThread.GetTickCount;
     while Ev.WaitFor(50) <> wrSignaled do
     begin
       CheckSynchronize;
-      if GetTickCount - Tick > 15000 then
+      if TThread.GetTickCount - Tick > 15000 then
         raise Exception.Create('CopyAsync timed out');
     end;
     CheckSynchronize;
@@ -131,11 +130,11 @@ begin
         Err := ADelErr;
         Ev.SetEvent;
       end);
-    Tick := GetTickCount;
+    Tick := TThread.GetTickCount;
     while Ev.WaitFor(50) <> wrSignaled do
     begin
       CheckSynchronize;
-      if GetTickCount - Tick > 15000 then
+      if TThread.GetTickCount - Tick > 15000 then
         raise Exception.Create('DeleteAsync timed out');
     end;
     CheckSynchronize;
@@ -164,11 +163,11 @@ begin
         Err := AMkErr;
         Ev.SetEvent;
       end);
-    Tick := GetTickCount;
+    Tick := TThread.GetTickCount;
     while Ev.WaitFor(50) <> wrSignaled do
     begin
       CheckSynchronize;
-      if GetTickCount - Tick > 15000 then
+      if TThread.GetTickCount - Tick > 15000 then
         raise Exception.Create('CreateDirectoryAsync timed out');
     end;
     CheckSynchronize;

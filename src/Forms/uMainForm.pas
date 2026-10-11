@@ -11,7 +11,7 @@ uses
   uTerminalTypes, uThemeTypes, uTerminalWindow, uDualPanelTypes, uDualPanelWindow,
   uEditorWindow, uConsoleWindow, uMdiCompositor, uThemeRegistry, uThemeSpec, uThemeProxy,
   uTerminalRenderer, uSession, uWinFileDragDrop, uKeymap, uShellProfiles, uShellAssoc,
-  uBaseConsoleWindow, uPluginHost, uVfsTypes, uColorCoding, uPanelColumns,
+  uBaseConsoleWindow, uPluginHost, uPluginPanelServices, uVfsTypes, uColorCoding, uPanelColumns,
   uDisplaySettings, uConsoleSettings, uEditorSearch, uSettingsTransfer, uElevation, uStrings, uUpdateController, uToast, uFrameStats, uThemeDrawing, uChromeRows, uDualPanelDrag,
   uDialogHost, uConsoleLaunch, uWindowChrome, uNotice, uHiddenDialogs, uPluginUi, uPluginChrome,
   uPluginSurface, uPluginServices;
@@ -2183,94 +2183,19 @@ end;
 
 function TMainForm.PluginServicesOfPanels: TPluginHostServices;
 begin
-  Result := Default(TPluginHostServices);
-  Result.DocInfo :=
-    function: string
+  Result := BuildPanelPluginServices(
+    function: TDualPanelWindow
     begin
-      if Assigned(FDualPanel) and (Assigned(FMdi) and (FMdi.Active = FDualPanel)) then
-        Result := FDualPanel.PluginDocInfoJson
-      else
-        Result := '';
-    end;
-  Result.DocGetText :=
-    function(AWhat: Integer; out AText: string): Boolean
+      Result := FDualPanel;
+    end,
+    function: Boolean
     begin
-      AText := '';
-      Result := Assigned(FDualPanel) and FDualPanel.PluginDocGetText(AWhat, AText);
-    end;
-  Result.DocReplace :=
-    function(AWhat: Integer; const AText: string): Boolean
-    begin
-      Result := Assigned(FDualPanel) and FDualPanel.PluginDocReplace(AWhat, AText);
-      if Result then
-        Recompose;
-    end;
-  Result.DocSetCursor :=
-    function(ARow, ACol: Integer): Boolean
-    begin
-      Result := Assigned(FDualPanel) and FDualPanel.PluginDocSetCursor(ARow, ACol);
-      if Result then
-        Recompose;
-    end;
-  Result.PanelInfo :=
-    function: string
-    begin
-      if Assigned(FDualPanel) then
-        Result := FDualPanel.PluginPanelInfoJson
-      else
-        Result := '';
-    end;
-  Result.PanelGoto :=
-    function(ASide: Integer; const AURI: string): Boolean
-    begin
-      Result := Assigned(FDualPanel) and FDualPanel.PluginPanelGoto(ASide, AURI);
-      if Result then
-        Recompose;
-    end;
-  Result.PanelRefresh :=
+      Result := Assigned(FMdi) and (FMdi.Active = FDualPanel);
+    end,
     procedure
     begin
-      if Assigned(FDualPanel) then
-      begin
-        FDualPanel.PluginPanelRefresh;
-        Recompose;
-      end;
-    end;
-  Result.PanelList :=
-    function(ASide: Integer): string
-    begin
-      if Assigned(FDualPanel) then
-        Result := FDualPanel.PluginPanelListJson(ASide)
-      else
-        Result := '';
-    end;
-  Result.PanelSetCursor :=
-    function(ASide: Integer; const AURI: string): Boolean
-    begin
-      Result := Assigned(FDualPanel) and FDualPanel.PluginPanelSetCursor(ASide, AURI);
-      if Result then
-        Recompose;
-    end;
-  Result.PanelSelect :=
-    function(ASide, AMode: Integer; const AArg: string): Boolean
-    begin
-      Result := Assigned(FDualPanel) and FDualPanel.PluginPanelSelect(ASide, AMode, AArg);
-      if Result then
-        Recompose;
-    end;
-  Result.DocSetSelection :=
-    function(ARow1, ACol1, ARow2, ACol2: Integer): Boolean
-    begin
-      Result := Assigned(FDualPanel) and FDualPanel.PluginDocSetSelection(ARow1, ACol1, ARow2, ACol2);
-      if Result then
-        Recompose;
-    end;
-  Result.DocLine :=
-    function(AIndex: Integer; out AText: string): Boolean
-    begin
-      AText := '';
-      Result := Assigned(FDualPanel) and FDualPanel.PluginDocLine(AIndex, AText);
-    end;
+      Recompose;
+    end);
 end;
 
 procedure TMainForm.CreateUpdater;

@@ -1,7 +1,8 @@
 unit TestSevenZipDllWarning;
 
-{ The startup warning about a missing 7z.dll: HostSevenZipDllMissing is True
-  only when the mtn.7z plugin folder exists without a 7z.dll. Also the first
+{ The startup warning about a missing archive engine: HostSevenZipDllMissing is
+  True only when the mtn.7z plugin folder exists and no engine is found (7z.dll
+  in it; on POSIX also a 7-Zip program in the search path). Also the first
   start of the plugin host: with fresh settings every plugin is switched off. }
 
 interface
@@ -22,7 +23,16 @@ type
 implementation
 
 uses
-  System.SysUtils, System.IOUtils, uPluginHost, uConfigLocation, uPluginManifest;
+  System.SysUtils, System.IOUtils, uPluginHost, uConfigLocation, uPluginManifest,
+  uPlatformPaths, uPlatformProcess;
+
+function EngineFileName: string;
+begin
+  if PlatformPosixPaths then
+    Result := '7zz'
+  else
+    Result := '7z.dll';
+end;
 
 procedure TTestSevenZipDllWarning.MissingOnlyWhenPluginFolderLacksDll;
 var
@@ -34,9 +44,10 @@ begin
     StartPluginHost(Root);
     Assert.IsFalse(HostSevenZipDllMissing, 'no mtn.7z folder: the plugin is not installed');
     TDirectory.CreateDirectory(TPath.Combine(Root, 'mtn.7z'));
-    Assert.IsTrue(HostSevenZipDllMissing, 'plugin folder without 7z.dll');
-    TFile.WriteAllText(TPath.Combine(Root, 'mtn.7z' + PathDelim + '7z.dll'), 'x');
-    Assert.IsFalse(HostSevenZipDllMissing, '7z.dll present');
+    Assert.AreEqual(PlatformSevenZipEngine(TPath.Combine(Root, 'mtn.7z')) = '', HostSevenZipDllMissing,
+      'plugin folder without an engine');
+    TFile.WriteAllText(TPath.Combine(Root, 'mtn.7z' + PathDelim + EngineFileName), 'x');
+    Assert.IsFalse(HostSevenZipDllMissing, 'engine present');
   finally
     StopPluginHost;
     TDirectory.Delete(Root, True);
@@ -122,7 +133,8 @@ begin
     TFile.WriteAllText(TPath.Combine(Cfg, 'disabled-plugins.json'), '{"disabled":[]}', TEncoding.UTF8);
     StartPluginHost(Root);
     Assert.IsFalse(HostAllPluginsOff, 'switched on again');
-    Assert.IsTrue(HostSevenZipDllMissing, 'now the missing dll matters');
+    Assert.AreEqual(PlatformSevenZipEngine(TPath.Combine(Root, 'mtn.7z')) = '', HostSevenZipDllMissing,
+      'now the missing engine matters');
   finally
     StopPluginHost;
     SetConfigDirectoryOverride(Prev);

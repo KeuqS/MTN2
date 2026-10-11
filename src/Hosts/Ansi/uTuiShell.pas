@@ -105,6 +105,11 @@ type
     /// <summary>The terminal window title: the program and the folder of the
     /// active panel.</summary>
     function Title: string;
+    /// <summary>Starts the plugin host and lets plugins reach the panels and
+    /// show dialogs; call once before the first frame.</summary>
+    procedure AttachPlugins(const APluginsDir: string);
+    /// <summary>Stops the plugin host.</summary>
+    procedure DetachPlugins;
     /// <summary>True when the screen must be composed again.</summary>
     property Dirty: Boolean read FDirty write FDirty;
     property Quit: Boolean read FQuit;
@@ -120,7 +125,8 @@ uses
   uShellProfiles, uDualPanelTypes, uDisplaySettings, uConsoleSettings,
   uEditorSearch, uEditorWindow, uBaseConsoleWindow, uPanelColumns, uThemeDrawing,
   uDualPanelDrag, uKeyChord, uDialogHost, uPlatformInfo, uTerminalWindow,
-  uDualPanelUiTypes, uToast, uWindowChrome, uConsoleLaunch;
+  uDualPanelUiTypes, uToast, uWindowChrome, uConsoleLaunch, uPluginHost,
+  uPluginPanelServices, uPluginServices, uPluginUi, uPluginChrome, uDialogTypes;
 
 const
   cDefaultThemeFallback = 'NDN';
@@ -192,6 +198,47 @@ begin
   FTheme := nil;
   FThemeProxy := nil;
   inherited Destroy;
+end;
+
+procedure TTuiShell.AttachPlugins(const APluginsDir: string);
+begin
+  StartPluginHost(APluginsDir);
+  // Dialogs a plugin asks for appear only over the panels, never inside an
+  // editor, viewer or terminal.
+  SetPluginDialogHost(
+    function(const ADecl: TDialogDeclaration; const AOnCommand: TProc<string, string>): Boolean
+    begin
+      Result := Assigned(FDualPanel) and (FMdi.Active = FDualPanel) and
+        FDualPanel.Visible and FDualPanel.ShowHostDialog(ADecl, AOnCommand);
+      if Result then
+        Recompose;
+    end);
+  SetPluginHostServices(BuildPanelPluginServices(
+    function: TDualPanelWindow
+    begin
+      Result := FDualPanel;
+    end,
+    function: Boolean
+    begin
+      Result := FMdi.Active = FDualPanel;
+    end,
+    procedure
+    begin
+      Recompose;
+    end));
+  SetPluginChromeChanged(
+    procedure
+    begin
+      Recompose;
+    end);
+end;
+
+procedure TTuiShell.DetachPlugins;
+begin
+  SetPluginHostServices(Default(TPluginHostServices));
+  SetPluginChromeChanged(nil);
+  SetPluginDialogHost(nil);
+  StopPluginHost;
 end;
 
 procedure TTuiShell.Recompose;

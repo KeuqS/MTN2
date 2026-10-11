@@ -16,6 +16,14 @@ type
 /// <summary>Name of the OpenSSH SFTP client in the search path.</summary>
 function PlatformSftpExeName: string;
 
+/// <summary>Full path of the archive engine the 7z plugin uses, searched in
+/// APluginDir first; empty when there is none (7z.dll on Windows, a 7-Zip
+/// command line program on POSIX).</summary>
+function PlatformSevenZipEngine(const APluginDir: string): string;
+
+/// <summary>Sentence telling how to install the missing archive engine.</summary>
+function PlatformSevenZipEngineHint: string;
+
 /// <summary>Spawns AExe with AArgs, writes AStdIn to its stdin then closes it,
 /// captures merged stdout and stderr. ATimeoutMs = 0 waits until the process
 /// exits or ACancel is signalled. A timeout or cancel kills the child. A
@@ -44,6 +52,18 @@ type
     destructor Destroy; override;
     property Buf: TBytesStream read FBuf;
   end;
+
+function PlatformSevenZipEngine(const APluginDir: string): string;
+begin
+  Result := IncludeTrailingPathDelimiter(APluginDir) + '7z.dll';
+  if not FileExists(Result) then
+    Result := '';
+end;
+
+function PlatformSevenZipEngineHint: string;
+begin
+  Result := 'Put 7z.dll into plugins\mtn.7z\ to open such files.';
+end;
 
 function PlatformSftpExeName: string;
 begin

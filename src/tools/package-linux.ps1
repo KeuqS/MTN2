@@ -1,8 +1,8 @@
 # Pack the terminal program (after src\build-linux.ps1) into
 #   dist\MTN2-<Version>-linux-x64.tar.gz
-# The archive holds a folder mtn2\ with the program, the F1 help, an empty
-# plugins\ folder (the self-check expects it), a version file, the license texts
-# and the Linux notes. tar runs in WSL so that the program keeps its execute bit.
+# The archive holds a folder mtn2\ with the program, the F1 help, the plugins
+# built by build-linux.ps1 (native .so libraries, manifests, WASM modules) and
+# libwasmtime.so, a version file, the license texts and the Linux notes. tar runs in WSL so that the program keeps its execute bit.
 param(
     [Parameter(Mandatory)]
     [string]$Version,
@@ -20,7 +20,12 @@ if (Test-Path (Join-Path $Dist 'linux-stage')) { Remove-Item (Join-Path $Dist 'l
 New-Item -ItemType Directory -Force -Path (Join-Path $Stage 'plugins') | Out-Null
 
 Copy-Item $Program $Stage
-if (Test-Path (Join-Path $Bin 'help')) { Copy-Item (Join-Path $Bin 'help') (Join-Path $Stage 'help') -Recurse }
+$PluginsBuilt = Join-Path $Bin 'linux64\plugins'
+if (Test-Path $PluginsBuilt) { Copy-Item (Join-Path $PluginsBuilt '*') (Join-Path $Stage 'plugins') -Recurse -Force }
+$Wasmtime = Join-Path $Bin 'linux64\libwasmtime.so'
+if (Test-Path $Wasmtime) { Copy-Item $Wasmtime $Stage }
+$Help = Join-Path $Bin 'linux64\help'
+if (Test-Path $Help) { Copy-Item $Help (Join-Path $Stage 'help') -Recurse }
 Copy-Item (Join-Path $Root 'LICENSE') $Stage
 Copy-Item (Join-Path $Root 'THIRD-PARTY.md') $Stage
 Copy-Item (Join-Path $Root 'CHANGELOG.md') $Stage

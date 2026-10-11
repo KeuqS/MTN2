@@ -12,7 +12,7 @@ $Studio = 'C:\Program Files (x86)\Embarcadero\Studio\37.0'
 $RsVars = Join-Path $Studio 'bin\rsvars.bat'
 $Dpr = Join-Path $PSScriptRoot 'DialogDesigner.dpr'
 $Project = Join-Path $PSScriptRoot 'DialogDesigner.dproj'
-$Bin = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..\..\bin'))
+$Bin = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..\..\bin\win64'))
 
 if (-not (Test-Path $RsVars)) {
     throw "rsvars.bat not found: $RsVars"

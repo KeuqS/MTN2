@@ -1,7 +1,7 @@
 unit TestSevenZipOpen;
 
-{ Opening archives through uSevenZipApi, with every 7z.dll found (7-Zip,
-  Far ArcLite):
+{ Opening archives through uSevenZipApi, with every archive engine found (7z.dll
+  of 7-Zip or Far ArcLite; a 7-Zip program on POSIX):
   - an archive with encrypted headers reports 'Encrypted' until the right
     password is set, so the panel asks for it instead of showing the
     archive as unsupported; an archive with plain headers lists without a
@@ -27,7 +27,7 @@ implementation
 
 uses
   System.SysUtils, System.Classes, System.IOUtils,
-  uSevenZipApi;
+  uPlatformPaths, uPlatformProcess, uSevenZipApi;
 
 const
   // 7z a -p1 -mhe=on hdr.7z inner.txt ("secret-payload")
@@ -61,6 +61,13 @@ var
   S: string;
 begin
   Result := [];
+  if PlatformPosixPaths then
+  begin
+    S := PlatformSevenZipEngine('');
+    if S <> '' then
+      Result := [S];
+    Exit;
+  end;
   S := GetEnvironmentVariable('MTN2_7Z_DLL');
   if (S <> '') and TFile.Exists(S) then
     Result := Result + [S];
@@ -102,7 +109,7 @@ var
   Dll, Arc, Err, Tag: string;
 begin
   if Length(Engines) = 0 then
-    Assert.Pass('SKIP: 7z.dll not found');
+    Assert.Pass('SKIP: no 7-Zip engine found');
   Arc := WriteFixture('hdr.7z', cHeaderEncrypted);
   for Dll in Engines do
   begin
@@ -130,7 +137,7 @@ var
   Data: TBytes;
 begin
   if Length(Engines) = 0 then
-    Assert.Pass('SKIP: 7z.dll not found');
+    Assert.Pass('SKIP: no 7-Zip engine found');
   Arc := WriteFixture('data.7z', cDataEncrypted);
   for Dll in Engines do
   begin
@@ -169,7 +176,7 @@ var
   Items: TArray<T7zItem>;
 begin
   if Length(Engines) = 0 then
-    Assert.Pass('SKIP: 7z.dll not found');
+    Assert.Pass('SKIP: no 7-Zip engine found');
   Arc := WriteFixture('backup.dat', cGzip);
   Plain := TPath.Combine(ExtractFilePath(Arc), 'notes.dat');
   TFile.WriteAllText(Plain, 'just some text, not an archive');

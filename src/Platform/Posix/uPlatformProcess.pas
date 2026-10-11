@@ -16,6 +16,14 @@ type
 /// <summary>Name of the OpenSSH SFTP client in the search path.</summary>
 function PlatformSftpExeName: string;
 
+/// <summary>Full path of the archive engine the 7z plugin uses, searched in
+/// APluginDir first; empty when there is none (7z.dll on Windows, a 7-Zip
+/// command line program on POSIX).</summary>
+function PlatformSevenZipEngine(const APluginDir: string): string;
+
+/// <summary>Sentence telling how to install the missing archive engine.</summary>
+function PlatformSevenZipEngineHint: string;
+
 /// <summary>Spawns AExe with AArgs, writes AStdIn to its stdin then closes it,
 /// captures merged stdout and stderr. ATimeoutMs = 0 waits until the process
 /// exits or ACancel is signalled. A timeout or cancel kills the child. A
@@ -53,6 +61,7 @@ type
 
 function c_pipe(AFds: PInteger): Integer; cdecl; external libc name 'pipe';
 function c_close(AFd: Integer): Integer; cdecl; external libc name 'close';
+function c_access(APath: MarshaledAString; AMode: Integer): Integer; cdecl; external libc name 'access';
 function c_read(AFd: Integer; ABuf: Pointer; ACount: NativeUInt): NativeInt; cdecl;
   external libc name 'read';
 function c_write(AFd: Integer; ABuf: Pointer; ACount: NativeUInt): NativeInt; cdecl;
@@ -97,6 +106,46 @@ begin
       Break;
     FBuf.Write(Chunk, N);
   end;
+end;
+
+function FindInPath(const AName: string): string;
+var
+  Dir: string;
+begin
+  for Dir in GetEnvironmentVariable('PATH').Split([':']) do
+    if Dir <> '' then
+    begin
+      Result := IncludeTrailingPathDelimiter(Dir) + AName;
+      if FileExists(Result) and (c_access(MarshaledAString(UTF8String(Result)), 1) = 0) then
+        Exit;
+    end;
+  Result := '';
+end;
+
+function PlatformSevenZipEngine(const APluginDir: string): string;
+const
+  cNames: array[0..3] of string = ('7zz', '7z', '7za', '7zr');
+var
+  Name, Path: string;
+begin
+  for Name in cNames do
+  begin
+    Path := IncludeTrailingPathDelimiter(APluginDir) + Name;
+    if (APluginDir <> '') and FileExists(Path) then
+      Exit(Path);
+  end;
+  for Name in cNames do
+  begin
+    Result := FindInPath(Name);
+    if Result <> '' then
+      Exit;
+  end;
+  Result := '';
+end;
+
+function PlatformSevenZipEngineHint: string;
+begin
+  Result := 'Install 7-Zip (package 7zip or p7zip-full) to open such files.';
 end;
 
 function PlatformSftpExeName: string;

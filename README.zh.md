@@ -44,11 +44,11 @@
 需要 RAD Studio 13（Delphi，`Studio\37.0`）及 Windows x64；编译 WASM 插件 `mtn.ws` 需要 Rust。
 
 ```powershell
-./src/build.ps1 -Config Release -Platform Win64   # bin\MTN2.exe + bin\plugins\
+./src/build.ps1 -Config Release -Platform Win64   # bin\win64\MTN2.exe + bin\win64\plugins\
 ./src/tests/run-tests.ps1                          # DUnitX 回归测试
 ```
 
-运行：`bin\MTN2.exe [--no-skia] [--fps] [路径]`。详细说明请参阅 [docs/BUILDING.md](docs/BUILDING.md)。
+运行：`bin\win64\MTN2.exe [--no-skia] [--fps] [路径]`。详细说明请参阅 [docs/BUILDING.md](docs/BUILDING.md)。
 
 ## 仓库结构
 
@@ -59,7 +59,7 @@
 | `src/plugins` | 内置插件（`mtn.7z`、`mtn.tmp`、`mtn.ws`、WASM 演示） |
 | `src/tests` | 按组划分的 DUnitX 回归测试及运行脚本 `run-tests.ps1` |
 | `src/tools` | DialogDesigner、ExportDialogJson、`Group.groupproj` 项目组、工具脚本 |
-| `bin/help` | F1 帮助文档（en/ru/de），随程序一同发布 |
+| `bin/win64/help` | F1 帮助文档（en/ru/de），随程序一同发布 |
 | `docs` | 开发者文档、截图（`docs/images`） |
 
 ## 相关文档
@@ -82,7 +82,7 @@
 - 路线图跟踪与任务规划；
 - 代码中绝大多数注释的编写；
 - 基于 DUnitX 的回归测试套件（`src/tests`）；
-- 面向用户的文本文档：F1 帮助（`bin/help`）、[CHANGELOG.md](CHANGELOG.md) 以及版本发布说明。
+- 面向用户的文本文档：F1 帮助（`bin/win64/help`）、[CHANGELOG.md](CHANGELOG.md) 以及版本发布说明。
 
 ## 许可证
 

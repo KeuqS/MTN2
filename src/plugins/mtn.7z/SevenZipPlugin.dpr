@@ -1,12 +1,14 @@
 library SevenZipPlugin;
 
-{ Native MTN2 VFS plugin: 7z:// backed by a local 7z.dll (LGPL, loaded from
-  this plugin directory). Listing / exists / read for unencrypted .7z archives. }
+{ Native MTN2 VFS plugin: 7z:// backed by a local archive engine: 7z.dll from
+  this folder on Windows, a 7-Zip command line program on POSIX (LGPL both).
+  Archives open like folders; entries are listed, read, unpacked and packed. }
 
 uses
-  System.SysUtils, System.Classes, System.IOUtils, Winapi.Windows,
+  System.SysUtils, System.Classes, System.IOUtils,
   uPluginHostAbi in '..\..\Core\uPluginHostAbi.pas',
-  uSevenZipApi in 'uSevenZipApi.pas',
+  uSevenZipApi,
+  uPlatformProcess, uPlatformInfo,
   uSevenZipVfs in 'uSevenZipVfs.pas',
   uVfsTypes in '..\..\Core\uVfsTypes.pas';
 
@@ -182,22 +184,13 @@ end;
 function SzGetFreeSpace(ARootURI: PAnsiChar; AUserData: Pointer;
   out AFree, ATotal: Int64): Int64; cdecl;
 var
-  ArchivePath, Inner, Root: string;
-  FreeAvail, TotalBytes: UInt64;
+  ArchivePath, Inner: string;
 begin
   AFree := 0;
   ATotal := 0;
   if not ParseSevenZipUri(UTF8ToString(ARootURI), ArchivePath, Inner) then
     Exit(Int64(verInvalidURI));
-  Root := ExtractFileDrive(ArchivePath);
-  if Root = '' then
-    Exit(Int64(verOk));
-  Root := Root + PathDelim;
-  if GetDiskFreeSpaceEx(PChar(Root), FreeAvail, TotalBytes, nil) then
-  begin
-    AFree := Int64(FreeAvail);
-    ATotal := Int64(TotalBytes);
-  end;
+  PlatformDiskSpace(ExtractFilePath(ArchivePath), AFree, ATotal);
   Result := Int64(verOk);
 end;
 
@@ -224,13 +217,13 @@ end;
 
 function mtn_plugin_init(AHostApi: PHostApiTable): Int64; cdecl;
 var
-  DllPath: string;
+  EnginePath: string;
 begin
   if AHostApi = nil then
     Exit(-1);
   GHostApi := AHostApi;
-  DllPath := TPath.Combine(ExtractFilePath(GetModuleName(HInstance)), '7z.dll');
-  if not SevenZipLoadEngine(DllPath) then
+  EnginePath := PlatformSevenZipEngine(ExtractFilePath(GetModuleName(HInstance)));
+  if (EnginePath = '') or not SevenZipLoadEngine(EnginePath) then
     Exit(-2);
 
   FillChar(GVfsCallbacks, SizeOf(GVfsCallbacks), 0);

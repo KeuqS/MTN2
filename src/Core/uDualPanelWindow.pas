@@ -1195,7 +1195,7 @@ type
 implementation
 
 uses
-  uPlatformInfo, uPlatformFolders, uPlatformPaths, uImageInfo, uFileClip, uWinFileDragDrop, uStrings, uFileHistory, uPanelCompare, uChromeRows,
+  uPlatformInfo, uPlatformProcess, uPlatformFolders, uPlatformPaths, uImageInfo, uFileClip, uWinFileDragDrop, uStrings, uFileHistory, uPanelCompare, uChromeRows,
   uExternalTools, uDialogHistory, uChecksums, uKeyChord, uConsoleSettings, uZipVfs,
   uCharWidth;
 
@@ -7228,7 +7228,7 @@ begin
         // 7z.dll can.
         if HostSevenZipDllMissing then
           OpenStub(skShellInfo, 'Shell open failed',
-            AError.Message + '. Put 7z.dll into plugins\mtn.7z\ to open such files.')
+            AError.Message + '. ' + PlatformSevenZipEngineHint)
         else
           ShellOpenSevenZipEntry(ZipEntryToSevenZipUri(AURI), Dst, False);
       end

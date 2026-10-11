@@ -799,7 +799,7 @@ begin
     if TDirectory.Exists(System.IOUtils.TPath.Combine(Dir, 'dialogs')) and
        TFile.Exists(System.IOUtils.TPath.Combine(Dir, 'MTN2.dpr')) then
       Exit(System.IOUtils.TPath.Combine(Dir, 'dialogs'));
-    // bin\DialogDesigner.exe sits next to src\, not inside it.
+    // bin\win64\DialogDesigner.exe sits below the folder holding src\, not inside it.
     Src := System.IOUtils.TPath.Combine(Dir, 'src');
     if TDirectory.Exists(System.IOUtils.TPath.Combine(Src, 'dialogs')) and
        TFile.Exists(System.IOUtils.TPath.Combine(Src, 'MTN2.dpr')) then

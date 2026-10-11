@@ -1,4 +1,4 @@
-# Pack the runtime part of bin\ (after src\build.ps1) into
+# Pack the runtime part of bin\win64\ (after src\build.ps1) into
 #   dist\MTN2-<Version>-win64.zip           -- settings in %APPDATA%\MTN2
 #   dist\MTN2-<Version>-win64-portable.zip  -- the same files + portable.dat,
 #                                              settings next to MTN2.exe
@@ -17,22 +17,22 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 $Root = Resolve-Path (Join-Path $PSScriptRoot '..\..')
-$Bin = Join-Path $Root 'bin'
+$Bin = Join-Path $Root 'bin\win64'
 $Dist = Join-Path $Root 'dist'
 $Stage = Join-Path $Dist 'MTN2'
 
 foreach ($Required in 'MTN2.exe', 'sk4d.dll') {
     # sk4d.dll: MTN2 renders through Skia and does not start without it.
     if (-not (Test-Path (Join-Path $Bin $Required))) {
-        throw "bin\$Required not found; run src\build.ps1 first"
+        throw "bin\win64\$Required not found; run src\build.ps1 first"
     }
 }
 if (-not (Test-Path (Join-Path $Bin 'wasmtime.dll'))) {
-    if ($RequireWasmtime) { throw 'bin\wasmtime.dll not found; run src\tools\fetch-wasmtime.ps1 and build again' }
-    Write-Host 'WARN: bin\wasmtime.dll missing -- WASM plugins will not load from this package'
+    if ($RequireWasmtime) { throw 'bin\win64\wasmtime.dll not found; run src\tools\fetch-wasmtime.ps1 and build again' }
+    Write-Host 'WARN: bin\win64\wasmtime.dll missing -- WASM plugins will not load from this package'
 }
 if (-not (Test-Path (Join-Path $Bin 'plugins\mtn.7z\7z.dll'))) {
-    if ($Require7z) { throw 'bin\plugins\mtn.7z\7z.dll not found; install 7-Zip (x64) or set MTN2_7Z_DLL and build again' }
+    if ($Require7z) { throw 'bin\win64\plugins\mtn.7z\7z.dll not found; install 7-Zip (x64) or set MTN2_7Z_DLL and build again' }
     Write-Host 'WARN: 7z.dll missing -- 7z archives will not open from this package'
 }
 if (Test-Path $Dist) { Remove-Item $Dist -Recurse -Force }

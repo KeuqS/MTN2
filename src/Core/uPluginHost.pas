@@ -10,8 +10,9 @@ uses
 
 procedure StartPluginHost(const APluginsDir: string);
 procedure StopPluginHost;
-/// <summary>True when the mtn.7z plugin is installed but has no 7z.dll next to
-/// it, so 7z / RAR / encrypted archives cannot be opened.</summary>
+/// <summary>True when the mtn.7z plugin is installed but has no archive engine
+/// (7z.dll next to it, or a 7-Zip program), so 7z / RAR / encrypted archives
+/// cannot be opened.</summary>
 function HostSevenZipDllMissing: Boolean;
 /// <summary>True when there are plugins and every one of them is switched off.</summary>
 function HostAllPluginsOff: Boolean;
@@ -80,7 +81,7 @@ implementation
 uses
   System.JSON, System.IOUtils, System.Math,
   uPluginLoader, uPluginHostAbi, uPluginManifest, uPluginPermissions, uVfsRegistry,
-  uConfigLocation, uPluginSettings;
+  uConfigLocation, uPluginSettings, uPlatformProcess;
 
 const
   cDisabledPluginsFile = 'disabled-plugins.json';
@@ -160,7 +161,7 @@ begin
   Dir := TPath.Combine(GPluginsDir, 'mtn.7z');
   // A switched-off plugin needs no 7z.dll.
   Result := (GPluginsDir <> '') and TDirectory.Exists(Dir) and
-    not TFile.Exists(TPath.Combine(Dir, '7z.dll')) and
+    (PlatformSevenZipEngine(Dir) = '') and
     not PluginLoader.IsPluginDisabled('mtn.7z');
 end;
 

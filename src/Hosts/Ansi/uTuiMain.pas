@@ -90,6 +90,11 @@ begin
 end;
 
 // Draws one screen as plain text; for checks without a terminal.
+function PluginsDir: string;
+begin
+  Result := TPath.Combine(ExtractFilePath(ParamStr(0)), 'plugins');
+end;
+
 function RunDump(const AOptions: TTuiOptions): Integer;
 var
   Shell: TTuiShell;
@@ -98,6 +103,7 @@ var
   Line: string;
 begin
   Shell := TTuiShell.Create(AOptions.DumpCols, AOptions.DumpRows);
+  Shell.AttachPlugins(PluginsDir);
   try
     if AOptions.Path <> '' then
       Shell.DualPanel.OpenPathAsNewTab(AOptions.Path);
@@ -122,6 +128,7 @@ begin
     end;
     Result := 0;
   finally
+    Shell.DetachPlugins;
     Shell.Free;
   end;
 end;
@@ -185,6 +192,7 @@ begin
           Term.WriteText(AText);
         end);
       Shell := TTuiShell.Create(Cols, Rows);
+      Shell.AttachPlugins(PluginsDir);
       if AOptions.Path <> '' then
         Shell.DualPanel.OpenPathAsNewTab(AOptions.Path);
       LastInput := PlatformTickCount64;
@@ -256,6 +264,8 @@ begin
       end;
       Shell.PersistSession;
     finally
+      if Assigned(Shell) then
+        Shell.DetachPlugins;
       Shell.Free;
       Term.WriteText(#27'[>4;0m' + AnsiLeaveSequence + #27'[23;2t');
       Term.LeaveRaw;

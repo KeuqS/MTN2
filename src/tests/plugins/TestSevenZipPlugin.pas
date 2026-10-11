@@ -1,6 +1,6 @@
 unit TestSevenZipPlugin;
 
-{ Loads SevenZipPlugin.dll + 7z.dll, packs a tiny archive through 7z.dll,
+{ Loads the SevenZipPlugin library and its archive engine, packs a tiny archive,
   then lists and reads it via the host VFS registry. }
 
 interface
@@ -21,7 +21,7 @@ implementation
 uses
   uTestPaths,
   System.SysUtils, System.Classes, System.IOUtils, System.SyncObjs, System.TypInfo,
-  Winapi.Windows,
+  uPlatformInfo, uPlatformPaths, uPlatformProcess,
   uVfsTypes,
   uTextEncoding,
   uVfsRegistry,
@@ -53,6 +53,8 @@ var
   Env, NextTo: string;
   I: Integer;
 begin
+  if PlatformPosixPaths then
+    Exit(PlatformSevenZipEngine(''));
   Env := GetEnvironmentVariable('MTN2_7Z_DLL');
   if (Env <> '') and TFile.Exists(Env) then
     Exit(Env);
@@ -82,11 +84,11 @@ begin
         Err := AListErr;
         Ev.SetEvent;
       end);
-    Tick := GetTickCount;
+    Tick := TThread.GetTickCount;
     while Ev.WaitFor(50) <> wrSignaled do
     begin
       CheckSynchronize;
-      if GetTickCount - Tick > 15000 then
+      if TThread.GetTickCount - Tick > 15000 then
         raise Exception.Create('ListDirectoryAsync timed out');
     end;
     CheckSynchronize;
@@ -114,11 +116,11 @@ begin
         Err := AReadErr;
         Ev.SetEvent;
       end);
-    Tick := GetTickCount;
+    Tick := TThread.GetTickCount;
     while Ev.WaitFor(50) <> wrSignaled do
     begin
       CheckSynchronize;
-      if GetTickCount - Tick > 15000 then
+      if TThread.GetTickCount - Tick > 15000 then
         raise Exception.Create('ReadBytesAsync timed out');
     end;
     CheckSynchronize;
@@ -146,11 +148,11 @@ begin
           Err := TVfsError.Ok;
         Ev.SetEvent;
       end, AOverwrite);
-    Tick := GetTickCount;
+    Tick := TThread.GetTickCount;
     while Ev.WaitFor(50) <> wrSignaled do
     begin
       CheckSynchronize;
-      if GetTickCount - Tick > 15000 then
+      if TThread.GetTickCount - Tick > 15000 then
         raise Exception.Create('CopyAsync timed out');
     end;
     CheckSynchronize;
@@ -160,14 +162,21 @@ begin
   end;
 end;
 
+// 7z.dll sits next to the plugin; a 7-Zip program is found in the search path.
+procedure StageEngine(const ADestDir, AEngine: string);
+begin
+  if SameText(ExtractFileExt(AEngine), '.dll') then
+    TFile.Copy(AEngine, TPath.Combine(ADestDir, '7z.dll'), True);
+end;
+
 procedure StagePlugin(const APluginsRoot, A7zDll, APluginDll: string);
 var
   DestDir: string;
 begin
   DestDir := TPath.Combine(APluginsRoot, 'mtn.7z');
   TDirectory.CreateDirectory(DestDir);
-  TFile.Copy(APluginDll, TPath.Combine(DestDir, 'SevenZipPlugin.dll'), True);
-  TFile.Copy(A7zDll, TPath.Combine(DestDir, '7z.dll'), True);
+  TFile.Copy(APluginDll, TPath.Combine(DestDir, PlatformSharedLibName('SevenZipPlugin')), True);
+  StageEngine(DestDir, A7zDll);
   TFile.WriteAllText(TPath.Combine(DestDir, 'plugin.json'),
     '{"id":"mtn.7z","name":"7-Zip archives","version":"0.1.0","abi":1}', TEncoding.UTF8);
 end;
@@ -190,17 +199,17 @@ procedure TTestSevenZipPlugin.Run;
 begin
   Dll7z := Find7zDll;
   if Dll7z = '' then
-    Assert.Pass('SKIP: 7z.dll not found (set MTN2_7Z_DLL or install 7-Zip / Far ArcLite)');
-  PluginDll := TPath.Combine(ExtractFilePath(ParamStr(0)), 'SevenZipPlugin.dll');
+    Assert.Pass('SKIP: no 7-Zip engine (7z.dll: set MTN2_7Z_DLL or install 7-Zip; POSIX: install 7zip or p7zip-full)');
+  PluginDll := TPath.Combine(ExtractFilePath(ParamStr(0)), PlatformSharedLibName('SevenZipPlugin'));
   if not TFile.Exists(PluginDll) then
-    raise Exception.Create('SevenZipPlugin.dll not found next to the test exe: ' + PluginDll);
+    raise Exception.Create('The SevenZipPlugin library is not next to the test exe: ' + PluginDll);
 
   WorkDir := TPath.Combine(TPath.GetTempPath, 'mtn2-7z-plugin');
   TDirectory.CreateDirectory(WorkDir);
   SrcTxt := TPath.Combine(WorkDir, 'hello.txt');
   ArcPath := TPath.Combine(WorkDir, 'hello.7z');
   TFile.WriteAllText(SrcTxt, 'hello-mtn2', TEncoding.UTF8);
-  Assert.IsTrue(SevenZipLoadEngine(Dll7z), 'load 7z.dll for fixture');
+  Assert.IsTrue(SevenZipLoadEngine(Dll7z), 'load the engine for the fixture');
   Assert.IsTrue(SevenZipCreateSimpleArchive(ArcPath, SrcTxt, Err), 'create fixture: ' + Err);
   Found := False;
   Assert.IsTrue(SevenZipListArchive(ArcPath, Listed, Err), 'in-process list: ' + Err);
@@ -229,7 +238,7 @@ begin
   StagePlugin(PluginsRoot, Dll7z, PluginDll);
   PluginLoader.LoadPluginsFrom(PluginsRoot);
   Assert.IsTrue(Loaded >= 1, 'SevenZipPlugin should load');
-  Assert.IsTrue(Failed = 0, 'helper 7z.dll must not fail the loader');
+  Assert.IsTrue(Failed = 0, 'the engine must not fail the loader');
   Assert.IsTrue(GlobalVfsRegistry.IsPluginOwned('7z:///C:/x.7z!/'), '7z:// is plugin-owned');
   Assert.IsTrue(PluginLoader.TrySetSecret('mtn.7z', ArcPath, ''), 'set_secret export');
   Assert.IsTrue(PluginLoader.TryClearSecret('mtn.7z', ArcPath), 'clear secret');
@@ -305,10 +314,10 @@ var
 begin
   Dll := Find7zDll;
   if Dll = '' then
-    Assert.Pass('SKIP: 7z.dll not found (set MTN2_7Z_DLL or install 7-Zip / Far ArcLite)');
-  DllPath := TPath.Combine(ExtractFilePath(ParamStr(0)), 'SevenZipPlugin.dll');
+    Assert.Pass('SKIP: no 7-Zip engine (7z.dll: set MTN2_7Z_DLL or install 7-Zip; POSIX: install 7zip or p7zip-full)');
+  DllPath := TPath.Combine(ExtractFilePath(ParamStr(0)), PlatformSharedLibName('SevenZipPlugin'));
   if not TFile.Exists(DllPath) then
-    raise Exception.Create('SevenZipPlugin.dll not found next to the test exe: ' + DllPath);
+    raise Exception.Create('The SevenZipPlugin library is not next to the test exe: ' + DllPath);
 
   Work := TPath.Combine(TPath.GetTempPath, 'mtn2-7z-zip-override');
   TDirectory.CreateDirectory(Work);
@@ -330,8 +339,8 @@ begin
   if TDirectory.Exists(Root) then
     TDirectory.Delete(Root, True);
   TDirectory.CreateDirectory(TPath.Combine(Root, 'mtn.7z'));
-  TFile.Copy(DllPath, TPath.Combine(Root, NativePath('mtn.7z/SevenZipPlugin.dll')), True);
-  TFile.Copy(Dll, TPath.Combine(Root, NativePath('mtn.7z/7z.dll')), True);
+  TFile.Copy(DllPath, TPath.Combine(Root, NativePath('mtn.7z/' + PlatformSharedLibName('SevenZipPlugin'))), True);
+  StageEngine(TPath.Combine(Root, 'mtn.7z'), Dll);
   TFile.Copy(ExpandFileName(TPath.Combine(ExtractFilePath(ParamStr(0)),
     NativePath('../../plugins/mtn.7z/plugin.json'))), TPath.Combine(Root, NativePath('mtn.7z/plugin.json')), True);
   try

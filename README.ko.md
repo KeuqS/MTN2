@@ -63,11 +63,11 @@ TrueType 폰트, 유니코드 및 32비트 트루컬러를 지원하는 Delphi F
 RAD Studio 13(Delphi, `Studio\37.0`) 및 Windows x64가 필요합니다. WASM 플러그인 `mtn.ws` 빌드에는 Rust가 필요합니다.
 
 ```powershell
-./src/build.ps1 -Config Release -Platform Win64   # bin\MTN2.exe + bin\plugins\
+./src/build.ps1 -Config Release -Platform Win64   # bin\win64\MTN2.exe + bin\win64\plugins\
 ./src/tests/run-tests.ps1                          # DUnitX 회귀 테스트
 ```
 
-실행: `bin\MTN2.exe [--no-skia] [--fps] [경로]`. 상세 내용은 [docs/BUILDING.md](docs/BUILDING.md)를 참조하십시오.
+실행: `bin\win64\MTN2.exe [--no-skia] [--fps] [경로]`. 상세 내용은 [docs/BUILDING.md](docs/BUILDING.md)를 참조하십시오.
 
 ## 저장소 구조
 
@@ -78,7 +78,7 @@ RAD Studio 13(Delphi, `Studio\37.0`) 및 Windows x64가 필요합니다. WASM �
 | `src/plugins` | 내장 플러그인 (`mtn.7z`, `mtn.tmp`, `mtn.ws`, WASM 데모) |
 | `src/tests` | 그룹별 DUnitX 회귀 테스트 및 실행 스크립트 `run-tests.ps1` |
 | `src/tools` | DialogDesigner, ExportDialogJson, `Group.groupproj` 프로젝트 그룹, 유틸리티 스크립트 |
-| `bin/help` | F1 도움말 (en/ru/de), 프로그램과 함께 제공 |
+| `bin/win64/help` | F1 도움말 (en/ru/de), 프로그램과 함께 제공 |
 | `docs` | 개발자 문서, 스크린샷 (`docs/images`) |
 
 ## 문서
@@ -101,7 +101,7 @@ MTN2 개발에는 자체 개발 도구를 포함한 AI 어시스턴트가 적극
 - 로드맵 추적 및 작업 계획 수립;
 - 대부분의 소스 코드 주석 작성;
 - DUnitX 기반 회귀 테스트 슈트 개발(`src/tests`);
-- 사용자 문서 작성: F1 도움말(`bin/help`), [CHANGELOG.md](CHANGELOG.md), 릴리스 노트.
+- 사용자 문서 작성: F1 도움말(`bin/win64/help`), [CHANGELOG.md](CHANGELOG.md), 릴리스 노트.
 
 ## 라이선스
 

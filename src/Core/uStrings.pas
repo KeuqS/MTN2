@@ -63,7 +63,7 @@ procedure SetLocale(const ALocale: string);
 function AvailableLocales: TArray<string>;
 /// <summary>Adds ADir to the folders searched for loose <locale>.json files,
 /// after <exedir>\strings. For dev tools that link no STRINGS_* resources
-/// and run from bin\ (DialogDesigner -> src\strings); the app itself never
+/// and run from bin\win64\ (DialogDesigner -> src\strings); the app itself never
 /// calls it. Takes effect on the next SetLocale/AvailableLocales.</summary>
 procedure AddStringsSearchDir(const ADir: string);
 

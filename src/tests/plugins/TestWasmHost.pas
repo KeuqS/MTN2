@@ -31,7 +31,6 @@ uses
   uTestPaths,
   System.SysUtils, System.Classes, System.IOUtils, System.SyncObjs, System.TypInfo,
   System.UITypes,
-  Winapi.Windows,
   uVfsTypes,
   uPluginSurface,
   uPluginServices,
@@ -87,11 +86,11 @@ begin
         Err := AListErr;
         Ev.SetEvent;
       end);
-    Tick := GetTickCount;
+    Tick := TThread.GetTickCount;
     while Ev.WaitFor(50) <> wrSignaled do
     begin
       CheckSynchronize;
-      if GetTickCount - Tick > 15000 then
+      if TThread.GetTickCount - Tick > 15000 then
         raise Exception.Create('ListDirectoryAsync timed out');
     end;
     CheckSynchronize;
@@ -119,11 +118,11 @@ begin
         Err := AReadErr;
         Ev.SetEvent;
       end);
-    Tick := GetTickCount;
+    Tick := TThread.GetTickCount;
     while Ev.WaitFor(50) <> wrSignaled do
     begin
       CheckSynchronize;
-      if GetTickCount - Tick > 15000 then
+      if TThread.GetTickCount - Tick > 15000 then
         raise Exception.Create('ReadTextAsync timed out');
     end;
     CheckSynchronize;

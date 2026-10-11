@@ -8,8 +8,7 @@ interface
 uses
   System.SysUtils, System.Classes, System.SyncObjs, System.JSON, System.IOUtils,
   System.DateUtils, System.Generics.Collections,
-  Winapi.Windows,
-  uVfsTypes, uPluginHostAbi;
+  uVfsTypes, uPluginHostAbi, uPlatformFileOps;
 
 procedure TmpPanelClear;
 function TmpPanelAddFromUri(const AFromURI: string): Int64;
@@ -120,7 +119,7 @@ var
   Path, Name: string;
   IsDir, Hidden, ReadOnly, SystemAttr: Boolean;
   Size: Int64;
-  Attr: Integer;
+  Entry: TVfsEntry;
 begin
   Arr := TJSONArray.Create;
   GLock.Acquire;
@@ -144,10 +143,11 @@ begin
       end
       else
         Continue;
-      Attr := GetFileAttributes(PChar(Path));
-      Hidden := (Attr <> Integer($FFFFFFFF)) and ((Attr and FILE_ATTRIBUTE_HIDDEN) <> 0);
-      ReadOnly := (Attr <> Integer($FFFFFFFF)) and ((Attr and FILE_ATTRIBUTE_READONLY) <> 0);
-      SystemAttr := (Attr <> Integer($FFFFFFFF)) and ((Attr and FILE_ATTRIBUTE_SYSTEM) <> 0);
+      Entry := Default(TVfsEntry);
+      PlatformFillEntryByPath(Path, Entry);
+      Hidden := Entry.IsHidden;
+      ReadOnly := Entry.IsReadOnly;
+      SystemAttr := Entry.IsSystem;
       Name := TPath.GetFileName(ExcludeTrailingPathDelimiter(Path));
       if Name = '' then
         Name := Path;

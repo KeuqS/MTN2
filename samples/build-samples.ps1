@@ -1,5 +1,5 @@
 # Builds the demo plugins in samples\plugins and, with -Install, copies them to
-# bin\plugins (next to MTN2.exe), where the host loads them at startup.
+# bin\win64\plugins (next to MTN2.exe), where the host loads them at startup.
 #
 #   ./samples/build-samples.ps1                 # build every sample whose toolchain is found
 #   ./samples/build-samples.ps1 -Install        # ... and install the results
@@ -29,7 +29,7 @@ $Samples = Join-Path $PSScriptRoot 'plugins'
 $Include = Join-Path $PSScriptRoot 'include'
 $BuildRoot = Join-Path $PSScriptRoot '.build'
 $Repo = Split-Path $PSScriptRoot -Parent
-$PluginsOut = Join-Path $Repo 'bin\plugins'
+$PluginsOut = Join-Path $Repo 'bin\win64\plugins'
 $Only = @($Only | ForEach-Object { $_ -split ',' } | Where-Object { $_ })
 
 function Find-Tool([string]$Name, [string[]]$Candidates) {
