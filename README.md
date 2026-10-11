@@ -40,14 +40,18 @@
 - **Обновления:** раз в сутки проверка новой версии на GitHub; загрузка (с проверкой SHA-256), установка
   и перезапуск – только после вопроса пользователю. Меню **≡ → Обновления...**.
 
-Сейчас поддерживается Windows x64; POSIX PTY и сборки под macOS/Linux – в планах.
+Поддерживаются Windows x64 (графическая программа) и Linux x86-64: `mtn2-tui` занимает весь текстовый терминал,
+в нём те же панели, просмотрщик, редактор, консоль и плагины, он работает по SSH и в `tmux` (см. [docs/LINUX.md](docs/LINUX.md)).
+Графическая версия для Linux и сборка под macOS – в планах.
 
 ## Установка
 
 Готовые сборки – на странице [Releases](https://github.com/Laex/MTN2/releases):
 
 - `MTN2-<версия>-win64.zip` – настройки и история хранятся в `%APPDATA%\MTN2`;
-- `MTN2-<версия>-win64-portable.zip` – переносная версия: всё хранится рядом с `MTN2.exe`.
+- `MTN2-<версия>-win64-portable.zip` – переносная версия: всё хранится рядом с `MTN2.exe`;
+- `MTN2-<версия>-linux-x64.tar.gz` и `MTN2-<версия>-linux-x64.deb` – версия для терминала Linux (`mtn2-tui`):
+  установка, зависимости и параметры – в [docs/LINUX.md](docs/LINUX.md).
 
 Архив достаточно распаковать в любую папку и запустить `MTN2.exe`. Дальше программа обновляется сама
 (меню **≡ → Обновления...**). В комплект входит `7z.dll` из [7-Zip](https://www.7-zip.org) (GNU LGPL; тексты лицензий – в
@@ -64,10 +68,13 @@ Dev-сборки содержат свежие изменения и могут 
 ## Сборка
 
 Нужны RAD Studio 13 (Delphi, `Studio\37.0`) и Windows x64; для WASM-плагина `mtn.ws` – Rust.
+Версия для Linux собирается из Windows компилятором `dcclinux64`, тесты для неё запускаются в WSL.
 
 ```powershell
 ./src/build.ps1 -Config Release -Platform Win64   # bin\win64\MTN2.exe + bin\win64\plugins\
 ./src/tests/run-tests.ps1                          # регрессионные тесты (DUnitX)
+./src/build-linux.ps1                              # bin\linux64\mtn2-tui
+./src/tests/run-tests-linux.ps1                    # те же тесты в WSL
 ```
 
 Запуск: `bin\win64\MTN2.exe [--no-skia] [--fps] [путь]`. Подробности – в [docs/BUILDING.md](docs/BUILDING.md).
@@ -76,11 +83,14 @@ Dev-сборки содержат свежие изменения и могут 
 
 | Путь | Содержимое |
 |---|---|
-| `src/Core` | ядро: панели, VFS, ConPTY, консоль, редактор, диалоги, плагинный хост |
+| `src/Core` | ядро: панели, VFS, консоль, редактор, диалоги, плагинный хост |
+| `src/Platform` | платформенный слой: `Windows` и `Posix` с одноимёнными модулями |
+| `src/Hosts` | оболочки: `Ansi` – версия для текстового терминала |
 | `src/Forms`, `src/dialogs`, `src/strings`, `src/Assets/themes` | главная форма, JSON-диалоги, локализация, встроенные темы |
 | `src/plugins` | встроенные плагины (`mtn.7z`, `mtn.tmp`, `mtn.ws`, WASM-демо) |
 | `src/tests` | регрессионные тесты DUnitX по группам и раннер `run-tests.ps1` |
 | `src/tools` | DialogDesigner, ExportDialogJson, группа проектов `Group.groupproj`, служебные скрипты |
+| `bin/win64`, `bin/linux64` | результат сборки по платформам |
 | `bin/win64/help` | справка F1 (en/ru/de), поставляется вместе с программой |
 | `docs` | документация разработчика, скриншоты (`docs/images`) |
 
@@ -89,6 +99,7 @@ Dev-сборки содержат свежие изменения и могут 
 - [SDS.md](docs/SDS.md) – полная спецификация: концепция, структуры данных, API, дорожная карта.
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md) – слои, потоки данных и инварианты.
 - [BUILDING.md](docs/BUILDING.md) – сборка, тесты, CI/CD.
+- [LINUX.md](docs/LINUX.md) – версия для терминала Linux: установка, параметры, зависимости.
 - [THEMES.md](docs/THEMES.md) – формат файла темы и роли цветов.
 - [HELP.md](docs/HELP.md) – исходный текст справки пользователя одним файлом.
 - Плагинные контракты: [PLUGIN_BOUNDARIES](docs/PLUGIN_BOUNDARIES.md), [PANEL](docs/PANEL_PLUGIN.md),

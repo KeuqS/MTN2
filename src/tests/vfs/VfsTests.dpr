@@ -31,6 +31,7 @@ uses
   TestZipEncryptedEntries in 'TestZipEncryptedEntries.pas',
   TestSpacedNames in 'TestSpacedNames.pas',
   TestPosixPaths in 'TestPosixPaths.pas',
+  TestPosixDrives in 'TestPosixDrives.pas',
   TestElevatedSudo in 'TestElevatedSudo.pas',
   TestOpenAsArchive in 'TestOpenAsArchive.pas',
   TestSftpVfs in 'TestSftpVfs.pas',

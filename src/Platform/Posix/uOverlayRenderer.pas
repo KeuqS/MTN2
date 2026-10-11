@@ -6,7 +6,7 @@ unit uOverlayRenderer;
   terminal) and written into the cells of the preview area. The conversion
   runs on a worker thread and is cached per file and area size; until it is
   ready the area stays empty. Without chafa the area shows a hint. Only local
-  files are previewed. The Windows build lives in Platform\Windows; each
+  files (file URIs or plain paths) are previewed. The Windows build lives in Platform\Windows; each
   project puts exactly one of the two directories on its unit search path. }
 
 interface
@@ -49,7 +49,7 @@ implementation
 
 uses
   System.SysUtils, System.SyncObjs, System.IOUtils, System.UITypes, System.Math,
-  uPlatformProcess, uAnsiPicture, uStrings;
+  uPlatformProcess, uAnsiPicture, uStrings, uVfsTypes;
 
 const
   cConvertTimeoutMs = 8000;
@@ -306,8 +306,8 @@ begin
 
   if Start then
   begin
-    Path := Uri;
-    if TFile.Exists(Path) then
+    Path := FileUriToPath(Uri);
+    if (Path <> '') and TFile.Exists(Path) then
       StartConversion(Key, Path, Cols, Rows)
     else
       StoreResult(Key, psFailed, nil);

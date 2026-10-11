@@ -13,7 +13,7 @@ uses
   System.SysUtils, System.Classes, System.Types, System.UITypes, System.Math,
   uTerminalTypes, uThemeTypes, uThemeProxy, uThemeSpec, uMdiCompositor,
   uDualPanelWindow, uConsoleWindow, uSession, uTermInput, uCoreTimer,
-  uUpdateController;
+  uUpdateController, uDisplaySettings;
 
 type
   TTuiShell = class
@@ -31,6 +31,7 @@ type
     FDirty: Boolean;
     FQuit: Boolean;
     FPeekTimer: TCoreTimer;
+    FDriveTimer: TCoreTimer;
     FUpdater: TUpdateController;
     FUpdateTimer: TCoreTimer;
     FLastClickTick: UInt64;
@@ -43,6 +44,8 @@ type
     procedure SwitchTheme(const AThemeId: string);
     procedure RestoreSession;
     procedure ApplyChromeRows(AMenuBar, AKeyBar, AStatusLine: Boolean);
+    function GetDisplaySettings: TDisplaySettings;
+    procedure ApplyDisplaySettings(const ASettings: TDisplaySettings);
     procedure CreateDualPanel;
     function EnsureConsole: TConsoleWindow;
     procedure SyncHiddenConsoleArea(ACols, ARows: Integer);
@@ -89,6 +92,7 @@ type
     procedure ThemePreview(const ASpec: TThemeSpec);
     function GetActiveThemeId: string;
     procedure PeekTimerTick(Sender: TObject);
+    procedure DriveTimerTick(Sender: TObject);
     // Commands of the console window.
     procedure ConsoleContentChanged(Sender: TObject);
     procedure ConsoleCloseRequest(Sender: TObject);
@@ -133,7 +137,7 @@ implementation
 
 uses
   System.IOUtils, uThemeRegistry, uColorCoding, uKeymap, uStrings, uChromeRows,
-  uShellProfiles, uDualPanelTypes, uDisplaySettings, uConsoleSettings,
+  uShellProfiles, uDualPanelTypes, uConsoleSettings,
   uEditorSearch, uEditorWindow, uBaseConsoleWindow, uPanelColumns, uThemeDrawing,
   uDualPanelDrag, uKeyChord, uDialogHost, uPlatformInfo, uTerminalWindow,
   uDualPanelUiTypes, uToast, uWindowChrome, uConsoleLaunch, uPluginHost,
@@ -142,6 +146,8 @@ uses
 
 const
   cDefaultThemeFallback = 'NDN';
+  // Pause after the last Ctrl+Left/Right that applies the chosen drive.
+  cDriveCommitMs = 700;
 
 constructor TTuiShell.Create(ACols, ARows: Integer);
 begin
@@ -187,6 +193,10 @@ begin
   FPeekTimer := TCoreTimer.Create(nil);
   FPeekTimer.Enabled := False;
   FPeekTimer.OnTimer := PeekTimerTick;
+  FDriveTimer := TCoreTimer.Create(nil);
+  FDriveTimer.Enabled := False;
+  FDriveTimer.Interval := cDriveCommitMs;
+  FDriveTimer.OnTimer := DriveTimerTick;
   AllocTerminalGrid(FGrid, FCols, FRows);
   FDirty := True;
 end;
@@ -197,6 +207,7 @@ begin
   FreeAndNil(FUpdateTimer);
   FreeAndNil(FUpdater);
   FreeAndNil(FPeekTimer);
+  FreeAndNil(FDriveTimer);
   // The windows call back into the shell while they close.
   if Assigned(FDualPanel) then
   begin
@@ -328,6 +339,55 @@ end;
 
 { ---- session ------------------------------------------------------------ }
 
+function TTuiShell.GetDisplaySettings: TDisplaySettings;
+begin
+  Result := DefaultDisplaySettings;
+  Result.CursorBlink := FSession.CursorBlink;
+  Result.ShowPanelIcons := GShowPanelIcons;
+  Result.ShowNotifications := GShowToasts;
+  Result.ShowTitleBar := GShowTitleBar;
+  Result.ShowMenuBar := GShowMenuBar;
+  Result.FileDrag := GFileDragEnabled;
+  Result.PassiveCursor := GShowPassiveCursor;
+  Result.ShowKeyBar := GShowKeyBar;
+  Result.ShowStatusLine := GShowStatusLine;
+  Result.ShadowStyle := GShadowStyle;
+  Result.MarkedRowStyle := GMarkedRowStyle;
+  Result.SelectFolders := FDualPanel.SelectFolders;
+  Result.Language := CurrentLocale;
+end;
+
+procedure TTuiShell.ApplyDisplaySettings(const ASettings: TDisplaySettings);
+var
+  LanguageChanged: Boolean;
+begin
+  // The terminal owns the font, the zoom, the window frame and the icons.
+  FSession.CursorBlink := ASettings.CursorBlink;
+  FSession.ShowNotifications := ASettings.ShowNotifications;
+  GShowToasts := ASettings.ShowNotifications;
+  FSession.PassiveCursor := ASettings.PassiveCursor;
+  GShowPassiveCursor := ASettings.PassiveCursor;
+  FSession.ShowMenuBar := ASettings.ShowMenuBar;
+  FSession.ShowKeyBar := ASettings.ShowKeyBar;
+  FSession.ShowStatusLine := ASettings.ShowStatusLine;
+  ApplyChromeRows(ASettings.ShowMenuBar, ASettings.ShowKeyBar, ASettings.ShowStatusLine);
+  FSession.ShadowStyle := ShadowStyleId(ASettings.ShadowStyle);
+  GShadowStyle := ASettings.ShadowStyle;
+  FSession.MarkedRows := MarkedRowStyleId(ASettings.MarkedRowStyle);
+  GMarkedRowStyle := ASettings.MarkedRowStyle;
+  FSession.SelectFolders := ASettings.SelectFolders;
+  FDualPanel.SelectFolders := ASettings.SelectFolders;
+  LanguageChanged := not SameText(CurrentLocale, ASettings.Language) and
+    not (SameText(CurrentLocale, 'en') and (Trim(ASettings.Language) = ''));
+  FSession.Language := ASettings.Language;
+  if LanguageChanged then
+  begin
+    SetLocale(ASettings.Language);
+    FDualPanel.ReloadMenuStructure;
+  end;
+  Recompose;
+end;
+
 procedure TTuiShell.ApplyChromeRows(AMenuBar, AKeyBar, AStatusLine: Boolean);
 begin
   GShowMenuBar := AMenuBar;
@@ -424,6 +484,8 @@ begin
   FDualPanel.OnShellCwdSync := DualPanelShellCwdSync;
   FDualPanel.OnSaveConsoleOutput := DualPanelSaveConsoleOutput;
   FDualPanel.OnClearConsoleBuffer := DualPanelClearConsoleBuffer;
+  FDualPanel.OnGetDisplaySettings := GetDisplaySettings;
+  FDualPanel.OnApplyDisplaySettings := ApplyDisplaySettings;
   FDualPanel.OnToggleConsole := DualPanelToggleConsole;
   FDualPanel.OnOpenTerminal := DualPanelOpenTerminal;
   FDualPanel.OnLaunchConsoleFile := DualPanelLaunchConsoleFile;
@@ -626,6 +688,15 @@ begin
   FPeekTimer.Enabled := False;
   if IsConsoleActiveInConsoleMode then
     ConsoleBackToPanels(Self);
+end;
+
+procedure TTuiShell.DriveTimerTick(Sender: TObject);
+begin
+  FDriveTimer.Enabled := False;
+  // A terminal reports no key releases: the drive chosen with Ctrl+Left/Right
+  // is applied when the keys stop coming.
+  FDualPanel.ApplyDrivePreview;
+  Recompose;
 end;
 
 procedure TTuiShell.DualPanelReturnWhenDone(Sender: TObject);
@@ -962,6 +1033,9 @@ begin
     Exit;
   end;
   DispatchTerminalKey(Key, Ch, Shift);
+  FDriveTimer.Enabled := False;
+  if FDualPanel.DrivePreviewActive then
+    FDriveTimer.Enabled := True;
   Recompose;
 end;
 

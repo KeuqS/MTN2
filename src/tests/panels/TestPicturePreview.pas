@@ -33,7 +33,7 @@ implementation
 uses
   System.SysUtils, System.IOUtils, System.Classes, System.UITypes,
   uPlatformPaths, uPlatformProcess, uPlatformFileAttr, uFileAttrTypes,
-  uTerminalTypes, uThemeTypes, uAnsiPicture, uOverlayRenderer;
+  uTerminalTypes, uThemeTypes, uAnsiPicture, uOverlayRenderer, uVfsTypes;
 
 const
   // Two rows of two upper-half blocks: red over blue, then green over white.
@@ -143,7 +143,7 @@ begin
   ClearTerminalGrid(Grid, TAlphaColors.Silver, TAlphaColors.Black);
   for I := 1 to 250 do
   begin
-    RequestOverlayPreview(Path, Area(2, 2, 9, 5));
+    RequestOverlayPreview(PathToFileUri(Path), Area(2, 2, 9, 5));
     PaintOverlayCells(Grid);
     if Grid[3][5].CharValue <> ' ' then
       Break;

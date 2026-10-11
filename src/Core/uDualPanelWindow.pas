@@ -958,6 +958,12 @@ type
     function HasBusyJob: Boolean;
     procedure RebuildBuffer; override;
     function SetKeyModifiers(AShift: TShiftState): Boolean; override;
+    /// <summary>True while a Ctrl+Left/Right drive choice waits for Ctrl to be
+    /// released.</summary>
+    function DrivePreviewActive: Boolean;
+    /// <summary>Applies the pending drive choice without waiting for the Ctrl
+    /// release (hosts that never see key releases).</summary>
+    procedure ApplyDrivePreview;
     function HandleInput(var AKey: Word; AShift: TShiftState;
       var AKeyChar: Char): Boolean; override;
     /// <summary>Free (non-modal) keymap bindings shared by most of the app -
@@ -11588,6 +11594,16 @@ begin
     if Assigned(FToast) and not Snap.DialogVisible and not HelpVisible then
       FToast.Draw(Buffer, Theme, W, H);
   end;
+end;
+
+function TDualPanelWindow.DrivePreviewActive: Boolean;
+begin
+  Result := FDrivePreviewActive;
+end;
+
+procedure TDualPanelWindow.ApplyDrivePreview;
+begin
+  CommitDrivePreview;
 end;
 
 function TDualPanelWindow.SetKeyModifiers(AShift: TShiftState): Boolean;

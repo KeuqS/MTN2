@@ -170,8 +170,10 @@ begin
   Result.Letter := ALetter;
   Result.RootPath := AMount.MountPoint;
   Result.KindLabel := KindOf(AMount);
-  Result.FsName := AMount.FsType;
-  Result.LabelOrPath := AMount.Source;
+  // The file system and the mount point arrive with PlatformFillDriveDetails:
+  // the drive cache treats an entry that has them as already answered.
+  Result.FsName := '';
+  Result.LabelOrPath := '';
   Result.TotalBytes := 0;
   Result.FreeBytes := 0;
   Result.SerialNumber := 0;
@@ -242,7 +244,15 @@ procedure PlatformFillDriveDetails(var AInfo: TDriveInfo);
 var
   St: _statvfs;
   Path: UTF8String;
+  Mount: TMount;
 begin
+  for Mount in ReadMounts do
+    if Mount.MountPoint = AInfo.RootPath then
+    begin
+      AInfo.FsName := Mount.FsType;
+      AInfo.LabelOrPath := Mount.MountPoint;
+      Break;
+    end;
   AInfo.TotalBytes := 0;
   AInfo.FreeBytes := 0;
   Path := UTF8String(AInfo.RootPath);
