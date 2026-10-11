@@ -330,7 +330,7 @@ var
   I: Integer;
 begin
   for I := 0 to FNodes.Count - 1 do
-    if SameText(FNodes[I].Path, APath) then
+    if SameLocalPath(FNodes[I].Path, APath) then
       Exit(I);
   Result := -1;
 end;
@@ -366,7 +366,7 @@ var
 begin
   FNodes.Clear;
   FCursor := 0;
-  Root := ExtractFileDrive(APath);
+  Root := LocalPathRootOf(APath);
   if Root = '' then
     Exit;
   Root := IncludeTrailingPathDelimiter(Root);
@@ -609,7 +609,7 @@ begin
   if not Uri.StartsWith('file:', True) or HasArchiveChain(Uri) then
     Exit;
   Path := FileUriToPath(Uri);
-  if ExtractFileDrive(Path) = '' then
+  if LocalPathRootOf(Path) = '' then
     Exit;
   FSide := ASide;
   FOwnerUri := Uri;
@@ -689,13 +689,13 @@ begin
     Exit;
   Path := FileUriToPath(Uri);
   // The tree sent the panel there itself: nothing to follow.
-  if SameText(ExcludeTrailingPathDelimiter(Path),
+  if SameLocalPath(ExcludeTrailingPathDelimiter(Path),
      ExcludeTrailingPathDelimiter(FFollowed)) then
     Exit;
   FFollowed := Path;
   FFollowTimer.Enabled := False;
-  if (FTree.Count = 0) or not SameText(ExtractFileDrive(Path),
-     ExtractFileDrive(FTree.Node(0).Path)) then
+  if (FTree.Count = 0) or not SameLocalPath(LocalPathRootOf(Path),
+     LocalPathRootOf(FTree.Node(0).Path)) then
   begin
     StartBuild(Path);
     Exit;
@@ -704,7 +704,7 @@ begin
   Gen := FGen;
   List := FList;
   Target := ExcludeTrailingPathDelimiter(Path);
-  Parts := Copy(Target, Length(ExtractFileDrive(Target)) + 2, MaxInt)
+  Parts := Copy(Target, Length(LocalPathRootOf(Target)) + 1, MaxInt)
     .Split([PathDelim], TStringSplitOptions.ExcludeEmpty);
   Self_ := Self;
   LifeRef := FLifeRef;
@@ -717,7 +717,7 @@ begin
       Dir: string;
       I: Integer;
     begin
-      Dir := IncludeTrailingPathDelimiter(ExtractFileDrive(Target));
+      Dir := IncludeTrailingPathDelimiter(LocalPathRootOf(Target));
       SetLength(Listings, Length(Parts) + 1);
       try
         for I := 0 to Length(Parts) do
@@ -816,7 +816,7 @@ begin
   if not FVisible or FLoading then
     Exit;
   Path := FTree.CursorPath;
-  if (Path = '') or SameText(Path, FFollowed) then
+  if (Path = '') or SameLocalPath(Path, FFollowed) then
     Exit;
   FFollowed := Path;
   if Assigned(FOnNavigate) then

@@ -3470,7 +3470,7 @@ begin
     begin
       // Listed with the password just entered: its files open without asking.
       if FArchivePasswordRetry and (M.GetLastError.Code = vecOk) then
-        FArchivesUnlocked.AddOrSetValue(LowerCase(ArchiveBasePath(URI)), True);
+        FArchivesUnlocked.AddOrSetValue(LocalPathKey(ArchiveBasePath(URI)), True);
       FArchivePasswordRetry := False;
     end;
     Exit;
@@ -3598,13 +3598,13 @@ begin
   if AIncludeZip and IsZipArchiveUri(Tab.CurrentURI) then
   begin
     Result := ZipEncryptedProbe(Tab.CurrentURI, AURIs, AArchivePath, AProbeUri) and
-      not FArchivesUnlocked.ContainsKey(LowerCase(AArchivePath));
+      not FArchivesUnlocked.ContainsKey(LocalPathKey(AArchivePath));
     Exit;
   end;
   if not IsSevenZipUri(Tab.CurrentURI) then
     Exit;
   AArchivePath := ArchiveBasePath(Tab.CurrentURI);
-  if (AArchivePath = '') or FArchivesUnlocked.ContainsKey(LowerCase(AArchivePath)) then
+  if (AArchivePath = '') or FArchivesUnlocked.ContainsKey(LocalPathKey(AArchivePath)) then
     Exit;
   Best := -1;
   for S in AURIs do
@@ -3674,7 +3674,7 @@ begin
         OpenArchiveActionPrompt(True);
         Exit;
       end;
-      FArchivesUnlocked.AddOrSetValue(LowerCase(FArchiveActionPath), True);
+      FArchivesUnlocked.AddOrSetValue(LocalPathKey(FArchiveActionPath), True);
       Action := FArchiveAction;
       FArchiveAction := nil;
       Action();
@@ -4023,7 +4023,7 @@ begin
     NewPath := FileUriToPath(Canon);
     RememberPanelDriveDir(Panel.DriveDirs, OldPath);
     ParentPath := FileUriToPath(ResolveFileUri(ParentFileUri(Tab.CurrentURI)));
-    if (OldPath <> '') and SameText(NewPath, ParentPath) then
+    if (OldPath <> '') and SameLocalPath(NewPath, ParentPath) then
     begin
       FPendingSelectName := FileUriTitle(Tab.CurrentURI);
       FPendingSelectSide := ASide;
@@ -4156,7 +4156,7 @@ begin
     Path := FileUriToPath(Tab.CurrentURI);
   if Path = '' then
     Exit;
-  Root := ExtractFileDrive(Path);
+  Root := LocalPathRootOf(Path);
   if Root = '' then
     Exit;
   // "D:" > "D:\"; UNC share root already usable with trailing delim.
@@ -6124,7 +6124,7 @@ begin
   Path := Trim(AFileName);
   if Path = '' then
     Exit;
-  if ExtractFileDrive(Path) = '' then
+  if LocalPathRootOf(Path) = '' then
   begin
     Ws := ActiveWorkspace;
     Line := FileUriToPath(ActiveTab(ActivePanel(Ws)).CurrentURI);
@@ -6273,7 +6273,7 @@ var
   Root, RootURI: string;
   Gen: Cardinal;
 begin
-  Root := ExtractFileDrive(APath);
+  Root := LocalPathRootOf(APath);
   if Root = '' then
   begin
     FFreeText := '';
@@ -6281,7 +6281,7 @@ begin
     Exit;
   end;
   Root := IncludeTrailingPathDelimiter(Root);
-  if SameText(Root, FFreeRoot) then
+  if SameLocalPath(Root, FFreeRoot) then
     Exit;
   FFreeRoot := Root;
   FFreeText := '';
@@ -6516,13 +6516,13 @@ begin
   if (Dir = '') or (AName = '') then
     Exit;
   Tick := PlatformTickCount64;
-  if (not SameText(Dir, FDescDir)) or (FDescMap = nil) or (Tick - FDescCheckedAt > 1500) then
+  if (not SameLocalPath(Dir, FDescDir)) or (FDescMap = nil) or (Tick - FDescCheckedAt > 1500) then
   begin
     // The timestamp is looked at every second or so, not on every frame.
     Path := DescriptionsFilePath(Dir);
     if not FileAge(Path, Stamp) then
       Stamp := 0;
-    if (not SameText(Dir, FDescDir)) or (FDescMap = nil) or (Stamp <> FDescStamp) then
+    if (not SameLocalPath(Dir, FDescDir)) or (FDescMap = nil) or (Stamp <> FDescStamp) then
     begin
       FreeAndNil(FDescMap);
       FDescMap := LoadDescriptions(Dir);

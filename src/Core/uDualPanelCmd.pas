@@ -6,7 +6,7 @@ interface
 
 uses
   System.SysUtils, System.StrUtils, System.IOUtils, System.Math, System.UITypes,
-  uVfsTypes, uTerminalTypes, uInputLine;
+  uVfsTypes, uPlatformPaths, uTerminalTypes, uInputLine;
 
 { Resolves AText as a navigable path relative to ABaseDir (panel cwd).
   Returns True and a file:// URI when the text is a path that should navigate
@@ -177,7 +177,8 @@ begin
   end;
 
   // Absolute Windows path / UNC / drive root "D:"
-  if ((Length(S) >= 2) and (S[2] = ':')) or S.StartsWith('\\') then
+  if not PlatformPosixPaths and
+     (((Length(S) >= 2) and (S[2] = ':')) or S.StartsWith('\\')) then
   begin
     if (Length(S) = 2) and (S[2] = ':') then
       S := S + PathDelim;
@@ -189,7 +190,8 @@ begin
     Exit;
 
   // Explicit "cd ...", or relative paths starting with ".", "\", or "/"
-  if IsCd or S.StartsWith('.') or S.StartsWith('\') or S.StartsWith('/') then
+  if IsCd or S.StartsWith('.') or S.StartsWith('/') or
+     (not PlatformPosixPaths and S.StartsWith('\')) then
   begin
     Combined := TPath.Combine(ABaseDir, S);
     AURI := PathToFileUri(Combined);
@@ -198,7 +200,8 @@ begin
 
   // Relative path without "cd" or "." (e.g. "subfolder\child"):
   // Only treat as path if command line contains no spaces (e.g. "dir /o" has spaces)
-  if (Pos(' ', OriginalText) = 0) and ((Pos('\', S) > 0) or (Pos('/', S) > 0)) then
+  if (Pos(' ', OriginalText) = 0) and
+     ((not PlatformPosixPaths and (Pos('\', S) > 0)) or (Pos('/', S) > 0)) then
   begin
     Combined := TPath.Combine(ABaseDir, S);
     AURI := PathToFileUri(Combined);
@@ -322,8 +325,9 @@ end;
 
 function CmdLineTokenIsPath(const AToken: string): Boolean;
 begin
-  Result := (Pos('\', AToken) > 0) or (Pos('/', AToken) > 0) or
-    ((Length(AToken) >= 2) and (AToken[2] = ':') and CharInSet(UpCase(AToken[1]), ['A'..'Z']));
+  Result := (Pos('/', AToken) > 0) or
+    (not PlatformPosixPaths and ((Pos('\', AToken) > 0) or
+      ((Length(AToken) >= 2) and (AToken[2] = ':') and CharInSet(UpCase(AToken[1]), ['A'..'Z']))));
 end;
 
 function CmdLinePathCompletions(const AToken, ABaseDir: string): TArray<string>;
@@ -339,20 +343,20 @@ begin
   // Split after the last separator; "C:" alone is a folder part too.
   Cut := 0;
   for I := Length(AToken) downto 1 do
-    if CharInSet(AToken[I], ['\', '/']) then
+    if (AToken[I] = '/') or (not PlatformPosixPaths and (AToken[I] = '\')) then
     begin
       Cut := I;
       Break;
     end;
-  if (Cut = 0) and (Length(AToken) >= 2) and (AToken[2] = ':') then
+  if not PlatformPosixPaths and (Cut = 0) and (Length(AToken) >= 2) and (AToken[2] = ':') then
     Cut := 2;
   DirPart := Copy(AToken, 1, Cut);
   NamePrefix := Copy(AToken, Cut + 1, MaxInt);
-  Dir := StringReplace(DirPart, '/', '\', [rfReplaceAll]);
+  Dir := StringReplace(DirPart, '/', PathDelim, [rfReplaceAll]);
   if Dir = '' then
     Dir := ABaseDir
-  else if (Length(Dir) = 2) and (Dir[2] = ':') then
-    Dir := Dir + '\'
+  else if (Length(Dir) = 2) and (Dir[2] = ':') and not PlatformPosixPaths then
+    Dir := Dir + PathDelim
   else if not TPath.IsPathRooted(Dir) then
     Dir := TPath.Combine(ABaseDir, Dir);
   if (Dir = '') or not TDirectory.Exists(Dir) then

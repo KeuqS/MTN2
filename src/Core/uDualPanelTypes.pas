@@ -250,7 +250,8 @@ end;
 function IsExecutablePanelFileExt(const AExt: string): Boolean;
 begin
   Result := (AExt = '.exe') or (AExt = '.com') or (AExt = '.bat') or (AExt = '.cmd') or
-    (AExt = '.msi') or (AExt = '.ps1') or (AExt = '.vbs') or (AExt = '.lnk');
+    (AExt = '.msi') or (AExt = '.ps1') or (AExt = '.vbs') or (AExt = '.lnk') or
+    (PlatformPosixPaths and ((AExt = '.sh') or (AExt = '.run') or (AExt = '.appimage')));
 end;
 
 function IsMediaPanelFileExt(const AExt: string): Boolean;

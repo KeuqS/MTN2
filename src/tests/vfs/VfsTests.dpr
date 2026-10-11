@@ -26,6 +26,7 @@ uses
   TestLongPaths in 'TestLongPaths.pas',
   TestRecycleBin in 'TestRecycleBin.pas',
   TestRecycleBinFailure in 'TestRecycleBinFailure.pas',
+  TestLocalPathLayer in 'TestLocalPathLayer.pas',
   TestResolveLocalDirPath in 'TestResolveLocalDirPath.pas',
   TestSevenZipUri in 'TestSevenZipUri.pas',
   TestZipEncryptedEntries in 'TestZipEncryptedEntries.pas',

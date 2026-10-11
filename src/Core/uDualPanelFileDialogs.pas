@@ -351,7 +351,7 @@ begin
   LinkTypeIdx := SuggestLinkTypeIndex(TargetPath, LinkFolder);
   // Same name as the source when the link lands in another folder; a prefix
   // only when it would collide with the source itself.
-  if (LinkFolder <> '') and not SameText(ExcludeTrailingPathDelimiter(LinkFolder),
+  if (LinkFolder <> '') and not SameLocalPath(ExcludeTrailingPathDelimiter(LinkFolder),
        ExcludeTrailingPathDelimiter(ExtractFilePath(ExcludeTrailingPathDelimiter(TargetPath)))) then
     Suggested := Name;
   UnfocusCmd;

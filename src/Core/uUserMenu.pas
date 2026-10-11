@@ -115,7 +115,7 @@ function UserMenuQuote(const AName: string): string;
 implementation
 
 uses
-  System.IOUtils, System.JSON, System.DateUtils, uConfigLocation, uStrings;
+  System.IOUtils, System.JSON, System.DateUtils, uConfigLocation, uStrings, uVfsTypes;
 
 const
   cUserMenuFile = 'usermenu.json';
@@ -158,8 +158,8 @@ begin
     if TFile.Exists(FolderUserMenuPath(Dir)) then
       Exit(FolderUserMenuPath(Dir));
     Parent := ExcludeTrailingPathDelimiter(ExtractFilePath(Dir));
-    if SameText(Parent, Dir) then
-      Break; // drive root ("C:") or UNC share root
+    if SameLocalPath(Parent, Dir) then
+      Break; // file system root or UNC share root
     Dir := Parent;
   end;
 end;
@@ -478,7 +478,7 @@ begin
           end;
         ':':
           begin
-            SB.Append(ExtractFileDrive(Info.Path));
+            SB.Append(LocalPathRootOf(Info.Path));
             Inc(I, 2);
           end;
         '&':

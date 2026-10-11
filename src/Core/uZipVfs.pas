@@ -339,7 +339,7 @@ end;
 
 class function TZipCdCacheHub.NormalizePathKey(const APath: string): string;
 begin
-  Result := AnsiLowerCase(ExcludeTrailingPathDelimiter(ExpandFileName(APath)));
+  Result := LocalPathKey(ExcludeTrailingPathDelimiter(ExpandFileName(APath)));
 end;
 
 class function TZipCdCacheHub.TryFileStamp(const APath: string; out ASize: Int64;

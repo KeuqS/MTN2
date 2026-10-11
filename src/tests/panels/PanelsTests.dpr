@@ -38,6 +38,7 @@ uses
   TestDualPanelTopMenu in 'TestDualPanelTopMenu.pas',
   TestWindowChrome in 'TestWindowChrome.pas',
   TestHistoryPopup in 'TestHistoryPopup.pas',
+  TestCmdLinePlatformPaths in 'TestCmdLinePlatformPaths.pas',
   TestJobPopupLayout in 'TestJobPopupLayout.pas',
   TestMarkedRowColors in 'TestMarkedRowColors.pas',
   TestPanelColumns in 'TestPanelColumns.pas',

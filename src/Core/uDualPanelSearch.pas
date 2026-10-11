@@ -383,7 +383,7 @@ begin
             if Rel.StartsWith(IncludeTrailingPathDelimiter(FSearch.RootPath), True) then
               Rel := Copy(Rel, Length(IncludeTrailingPathDelimiter(FSearch.RootPath)) + 1,
                 MaxInt)
-            else if SameText(Rel, FSearch.RootPath) then
+            else if SameLocalPath(Rel, FSearch.RootPath) then
               Rel := ExtractFileName(Rel);
           end;
           if Length(Rel) > R.Width - 2 then

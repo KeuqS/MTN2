@@ -398,32 +398,27 @@ file:///D:/data/bundle.zip!/nested.zip!/a.txt
 
 Существующий код (`uConPty` – теперь настоящий ConPTY, не pipes; `uConsoleBuffer` line-buffer + alt-screen grid; `uConsoleWindow`) – фундамент, наращиваемый по мере развития, не параллельной второй подсистемой вывода.
 
-### 8.4. Карта точек связности с Windows (для будущего «PTY на Linux/macOS»)
+### 8.4. Платформенные слои: Windows и Linux
 
-Разработка и отладка сегодня ведутся под Windows, и roadmap намеренно ставит daily-use функции впереди POSIX-порта (§7 SDS). Это не значит, что новый код может свободно врастать в Winapi.* где угодно – ниже список мест, отмеченных в коде комментарием `CROSS-PLATFORM`, чтобы порт впоследствии не начинался с археологии. Три категории:
+Платформенный код лежит в двух каталогах с одинаковыми именами юнитов: `src/Platform/Windows` и `src/Platform/Posix`. `MTN2.dpr` подключает юниты `Platform\Windows` явными путями, `build-linux.ps1` ставит в путь поиска `Core;Platform\Posix;Hosts\Ansi`, поэтому одно и то же `uses uPlatformPaths` в общем коде попадает в нужный слой. Условной компиляции (`{$IFDEF MSWINDOWS}`) в `Core`, `Forms` и `Hosts` нет; допустима только внутри юнита платформенного слоя.
 
-**A. Есть заготовленный шов, но он не используется по назначению**
-- `uConPty.pas` – интерфейс `IPtySession` объявлен как раз для подмены бэкенда, но `TBaseConsoleWindow.FPty` (`uBaseConsoleWindow.pas`) типизирован конкретным классом `TConPtySession`, а не интерфейсом. Первый шаг POSIX-порта консоли – сменить тип поля на `IPtySession`, не переписывать сам класс.
+Правила для общего кода (`Core`, `Hosts`):
+- `Winapi.*`, `Posix.*` и платформенные константы – только в `Platform\*`; `Forms\uMainForm.pas` и `Hosts\Fmx` – графическая оболочка Windows и подчиняются другим правилам.
+- Различие путей решает `PlatformPosixPaths`, а не проверка символов: сравнение путей – `SameLocalPath`, ключ словаря – `LocalPathKey`, корень – `LocalPathRootOf`, «абсолютный ли путь» – `IsLocalAbsolutePath`, разделитель – `PathDelim`. Буква диска (`X:`), `\` как разделитель и префикс `\\?\` разбираются только в ветках для Windows.
+- Новая возможность, у которой есть платформенная реализация, получает юнит с тем же именем и тем же публичным интерфейсом в обоих каталогах. Юнит только для одной платформы (`uConPtyApi`, `uElevatedHelper`, `uElevatedWin`, `uSingleInstance`, `uNativeSurface` у Windows; `uSystemClipboard` у Posix) не используется общим кодом.
 
-**B. Публичный контракт уже платформо-нейтрален, платформенная часть – только реализация**
-- `uDirWatch.pas` (`FindFirstChangeNotification` → нужен inotify/kqueue) – `Create`/`SetPath`/`OnChanged` уже не выдают Windows-типов наружу.
-- `uConfigLocation.pas` – уже не использует Winapi.* вообще; `GetEnvironmentVariable('APPDATA')` пуст на POSIX и код сам падает на `TPath.GetHomePath`. Не XDG-корректно (`$XDG_CONFIG_HOME` не читается), но и не падает.
-- `uVfsUtils.pas` – `CompareNaturalText` сравнивает текстовые участки имён через `CompareStringW` под `{$IFDEF MSWINDOWS}`, иначе `CompareText(..., loUserLocale)`; контракт (натуральный, без учёта регистра, по языку пользователя) платформо-нейтрален.
+Что в каждом слое реализовано по-своему:
+- `uConPty.pas` – ConPTY на Windows, `forkpty` на Linux, за общим интерфейсом `IPtySession`.
+- `uDirWatch.pas` – `FindFirstChangeNotification` и inotify.
+- `uShellProfiles.pas`, `uShellAssoc.pas` – каталог оболочек и ассоциации файлов; `uShellIcons.pas` – иконки Windows Shell, на Linux иконок нет и остаются значки типа файла.
+- `uRecycleBinVfs.pas`, `uFileRecycleBin.pas` (`recycle://`) – Корзина Windows и каталог Trash по спецификации freedesktop.org.
+- `uPlatformDrives.pas` – диски Windows или смонтированные файловые системы Linux, которым присваиваются буквы для меню смены диска.
+- `uPlatformFileAttr.pas`, `uPlatformFileOps.pas`, `uLinkUtils.pas` – атрибуты R/H/S/A, владелец и ACL, junction'ы на Windows; права доступа, владелец, символические и жёсткие ссылки на Linux.
+- `uElevation.pas`, `uElevatedVfs.pas` – операции с правами администратора: UAC-помощник на Windows, команды через `sudo` на Linux.
+- `uWinFileDragDrop.pas` – OLE drag-out; на Linux – буфер обмена файлов через `xclip` или `wl-copy`.
+- `uOverlayRenderer.pas` – просмотр картинки поверх сетки: на Windows растром, на Linux блочными символами через `chafa`. `DrawOverlayPreview` и `ShellIconBitmap` есть только в Windows-слое, потому что их вызывает графическая оболочка FMX, которой на Linux нет.
 
-**C. Функциональность целиком Windows-специфична – порт не переиспользует внутренности, только контракт/схему**
-- `uConPtyApi.pas`, `uConPty.pas` – ConPTY; POSIX-эквивалент: `forkpty`/`termios`, за тем же `IPtySession` (см. пункт A).
-- `uShellProfiles.pas` – каталог профилей (cmd/PowerShell/pwsh/WSL) сам по себе Windows-специфичен, не только процесс запуска; POSIX – свой каталог (bash/zsh/fish) той же формы (`TShellProfileInfo`/`TShellProfileArray`). Копия профиля – идентификатор `<профиль>#N`: `NormalizeShellProfileId` сводит его к профилю (оболочка и поведение те же), `CanonicalShellProfileId` оставляет суффикс.
-- `uShellProfileOptions.pas` – `shellprofiles.json`: копии профилей, порядок списка и режим клавиш профиля (авто / терминал / хост). `TBaseConsoleWindow.KeysToProgram` решает, получает ли программа клавиши, которые окно тоже занимает (F1, F9, Alt+буква); оставляет окну только `IsKeyboardCaptureExitAction` (выход из консоли, полный экран, вкладки, новый терминал). `uTerminalKeys.pas` кодирует F-клавиши, Alt/Ctrl-сочетания и стрелки с модификаторами в xterm-последовательности.
-- `uDriveInfo.pas` – буквы дисков не обобщаются на POSIX; там другая UI-модель (примонтированные ФС под одним `/`), не просто другой источник данных.
-- `uWinFileDragDrop.pas` – OLE drag-out; на других платформах – опциональная деградация (no-op), не редизайн.
-- `uShellIcons.pas` – иконки из Windows Shell; на Linux – freedesktop icon theme, на macOS – `NSWorkspace`; общий контракт – кэш по `IconId`.
-- `uRecycleBinVfs.pas` (`recycle://`) – `IShellFolder2`/`CSIDL_BITBUCKET`; Linux – Trash spec freedesktop.org, macOS – `.Trashes`. Отдельный VFS-бэкенд под ту же схему URI.
-- `uSysFoldersVfs.pas` (`sys://folders`) – источник списка системных папок платформо-специфичен (Windows API vs XDG user dirs vs `NSSearchPathForDirectoriesInDomains`), контракт (`TargetURI`) общий.
-- `uLinkUtils.pas` – junction'ы – чисто NTFS-концепция, порта не будет вообще; symlink/hardlink на POSIX есть, но через `symlink()`/`link()`, не через текущий `kernel32`-код.
-- `uWinFileAttr.pas` – атрибуты R/H/S/A, владелец (ACL) и даты (`SetFileTime`) – Windows; POSIX – `chmod`/`chown`/`utimensat`, другой набор атрибутов.
-- `uShellAssoc.pas` – уже спроектирован как platform shell association с явной пометкой в заголовке «Windows today, other OS later»; ничего менять не нужно, только использовать как образец для остальных пунктов этого списка.
-
-**Не в списке специально:** десятки файлов, где `Winapi.Windows` встречается только ради `VK_*`-констант клавиш или мелких системных вызовов (`uKeymap.pas`, `uTopMenuBar.pas`, `uDualPanelWindow.pas` и т.п.) – это не архитектурная связность, а мелкие точки, которые обычная FMX-кроссплатформенная сборка (Linux/macOS таргеты уже поддерживаются FireMonkey) сама заставит поправить при первой POSIX-компиляции; помечать их заранее – шум, не сигнал.
+Что остаётся в общем коде осознанно: разбор приглашений `cmd` и PowerShell в `uConsoleBuffer.pas` (на Linux применяется запасной признак `$`/`#`), каталог профилей оболочек с идентификаторами `cmd`, `powershell`, `pwsh` в `uConsoleLaunch.pas`, `uBaseConsoleWindow.pas`, `uTerminalWorkspace.pas`, а также протокол `uElevatedProtocol.pas`.
 
 ### 8.5. Возврат в панели и фоновый запуск
 

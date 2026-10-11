@@ -90,7 +90,7 @@ type
 implementation
 
 uses
-  uStrings, uKeyChord, uChromeRows;
+  uStrings, uKeyChord, uChromeRows, uVfsTypes;
 
 const
   cTextFg      = TAlphaColor($FFE0E0E0);
@@ -103,8 +103,8 @@ const
 
 function SamePathNorm(const A, B: string): Boolean;
 begin
-  Result := SameText(ExcludeTrailingPathDelimiter(A),
-                     ExcludeTrailingPathDelimiter(B));
+  Result := SameLocalPath(ExcludeTrailingPathDelimiter(A),
+                          ExcludeTrailingPathDelimiter(B));
 end;
 
 { ---- Constructor ----------------------------------------------------------- }

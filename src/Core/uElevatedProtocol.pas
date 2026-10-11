@@ -287,10 +287,9 @@ begin
   Path := FileUriToPath(AURI);
   if Path = '' then
     Exit;
-  // A drive path (C:\...) or a UNC share (\\host\share\...); the path is
-  // already normalized, so ".." cannot be left in it.
-  Result := ((Length(Path) >= 3) and (Path[2] = ':') and (Path[3] = '\')) or
-    (Copy(Path, 1, 2) = '\\');
+  // A path from a root of the local file system; it is already normalized,
+  // so ".." cannot be left in it.
+  Result := IsLocalAbsolutePath(Path);
 end;
 
 function ValidateRequest(const ARequest: TElevatedRequest; out AReason: string): Boolean;

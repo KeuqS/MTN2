@@ -149,6 +149,18 @@ function LocalPathIsFile(const APath: string): Boolean;
 /// IFileOperation, ShellExecute): they reject the prefix.</summary>
 function WinApiPath(const APath: string): string;
 function DriveLetterOf(const APath: string): Char;
+/// <summary>Local paths compare case-insensitively on Windows, exactly
+/// elsewhere.</summary>
+function SameLocalPath(const A, B: string): Boolean;
+/// <summary>Dictionary key for a local path: lower-cased on Windows, as is
+/// elsewhere.</summary>
+function LocalPathKey(const APath: string): string;
+/// <summary>Root of a local path: the drive ("C:") or UNC share on Windows,
+/// "/" on Posix systems; '' for a relative path.</summary>
+function LocalPathRootOf(const APath: string): string;
+/// <summary>True for a path that starts at a root of the local file system
+/// (drive path or UNC share on Windows, leading "/" elsewhere).</summary>
+function IsLocalAbsolutePath(const APath: string): Boolean;
 /// <summary>Absolute, delimiter-normalized local path. Safe on an
 /// unresponsive network drive: a bare drive letter or an already-rooted
 /// drive path ("P:", "P:\") is resolved from pure string logic, never via
@@ -451,6 +463,8 @@ const
   cLongPathThreshold = cMaxPath - 12;
 begin
   Result := APath;
+  if PlatformPosixPaths then
+    Exit;
   if (Length(Result) < cLongPathThreshold) or Result.StartsWith('\\?\') or
      Result.StartsWith('\\.\') then
     Exit;
@@ -495,6 +509,28 @@ begin
     Result := UpCase(P[1])
   else
     Result := #0;
+end;
+
+function LocalPathRootOf(const APath: string): string;
+begin
+  if PlatformPosixPaths then
+  begin
+    if APath.StartsWith('/') then
+      Result := '/'
+    else
+      Result := '';
+  end
+  else
+    Result := ExtractFileDrive(APath);
+end;
+
+function IsLocalAbsolutePath(const APath: string): Boolean;
+begin
+  if PlatformPosixPaths then
+    Result := APath.StartsWith('/')
+  else
+    Result := ((Length(APath) >= 3) and (APath[2] = ':') and (APath[3] = '\')) or
+      APath.StartsWith('\\');
 end;
 
 function ResolveLocalDirPath(const APath: string): string;

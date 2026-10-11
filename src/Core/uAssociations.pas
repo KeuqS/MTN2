@@ -32,13 +32,14 @@ implementation
 
 uses
   System.SysUtils, System.IOUtils,
-  uShellAssoc;
+  uPlatformPaths, uShellAssoc;
 
 function IsLaunchableExt(const AExt: string): Boolean;
 begin
   Result := (AExt = '.exe') or (AExt = '.bat') or (AExt = '.cmd') or
     (AExt = '.com') or (AExt = '.msi') or (AExt = '.ps1') or
-    (AExt = '.vbs') or (AExt = '.lnk');
+    (AExt = '.vbs') or (AExt = '.lnk') or
+    (PlatformPosixPaths and ((AExt = '.sh') or (AExt = '.run') or (AExt = '.appimage')));
 end;
 
 function IsEditorExt(const AExt: string): Boolean;
