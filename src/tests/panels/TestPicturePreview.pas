@@ -24,6 +24,7 @@ type
     [Test] procedure ParserReadsPaletteColorsAndReset;
     [Test] procedure ParserSkipsOtherSequences;
     [Test] procedure PreviewWritesConvertedCellsCentered;
+    [Test] procedure FinishedPictureIsPaintedWithoutAnotherRequest;
     [Test] procedure PreviewNeedsARequestForEveryFrame;
     [Test] procedure MissingConverterShowsAHint;
   end;
@@ -159,6 +160,29 @@ begin
   Assert.IsTrue(Pos('--size=8x4', Args) > 0, 'asked for the area size: ' + Args);
   Assert.IsTrue(Pos('--format=symbols', Args) > 0, 'text output works in every terminal: ' + Args);
   Assert.IsTrue(Pos(Path, Args) > 0, 'file name passed: ' + Args);
+end;
+
+procedure TTestPicturePreview.FinishedPictureIsPaintedWithoutAnotherRequest;
+var
+  Grid: TTerminalGrid;
+  I: Integer;
+begin
+  if not PlatformPosixPaths then
+    Exit;
+  InstallFakeChafa;
+  AllocTerminalGrid(Grid, 20, 10);
+  ClearTerminalGrid(Grid, TAlphaColors.Silver, TAlphaColors.Black);
+  RequestOverlayPreview(PathToFileUri(NewPicture), Area(2, 2, 9, 5));
+  PaintOverlayCells(Grid);
+  // Later frames come from the repaint after the conversion, not from a new request.
+  for I := 1 to 250 do
+  begin
+    Sleep(20);
+    PaintOverlayCells(Grid);
+    if Grid[3][5].CharValue <> ' ' then
+      Break;
+  end;
+  Assert.AreEqual(#$2580, string(Grid[3][5].CharValue), 'picture appears once converted');
 end;
 
 procedure TTestPicturePreview.PreviewNeedsARequestForEveryFrame;

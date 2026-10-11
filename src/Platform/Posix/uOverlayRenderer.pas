@@ -87,6 +87,11 @@ begin
     GReadyState := AState;
     GReadyPicture := APicture;
     GPendingKey := '';
+    // The frame that follows may not request the preview again; the finished
+    // picture of the current request must still be painted once.
+    if (GUri <> '') and (AKey = BoundsKey(GUri, GBounds.Right - GBounds.Left + 1,
+         GBounds.Bottom - GBounds.Top + 1)) then
+      GTouched := True;
     Handler := GRepaint;
   finally
     GLock.Leave;

@@ -32,6 +32,8 @@ type
     FQuit: Boolean;
     FPeekTimer: TCoreTimer;
     FDriveTimer: TCoreTimer;
+    FAltTimer: TCoreTimer;
+    FHeldShift: TShiftState;
     FUpdater: TUpdateController;
     FUpdateTimer: TCoreTimer;
     FLastClickTick: UInt64;
@@ -93,6 +95,7 @@ type
     function GetActiveThemeId: string;
     procedure PeekTimerTick(Sender: TObject);
     procedure DriveTimerTick(Sender: TObject);
+    procedure AltTimerTick(Sender: TObject);
     // Commands of the console window.
     procedure ConsoleContentChanged(Sender: TObject);
     procedure ConsoleCloseRequest(Sender: TObject);
@@ -148,6 +151,7 @@ const
   cDefaultThemeFallback = 'NDN';
   // Pause after the last Ctrl+Left/Right that applies the chosen drive.
   cDriveCommitMs = 700;
+  cAltReleaseMs = 1500;
 
 constructor TTuiShell.Create(ACols, ARows: Integer);
 begin
@@ -197,6 +201,10 @@ begin
   FDriveTimer.Enabled := False;
   FDriveTimer.Interval := cDriveCommitMs;
   FDriveTimer.OnTimer := DriveTimerTick;
+  FAltTimer := TCoreTimer.Create(nil);
+  FAltTimer.Enabled := False;
+  FAltTimer.Interval := cAltReleaseMs;
+  FAltTimer.OnTimer := AltTimerTick;
   AllocTerminalGrid(FGrid, FCols, FRows);
   FDirty := True;
 end;
@@ -208,6 +216,7 @@ begin
   FreeAndNil(FUpdater);
   FreeAndNil(FPeekTimer);
   FreeAndNil(FDriveTimer);
+  FreeAndNil(FAltTimer);
   // The windows call back into the shell while they close.
   if Assigned(FDualPanel) then
   begin
@@ -690,6 +699,16 @@ begin
     ConsoleBackToPanels(Self);
 end;
 
+procedure TTuiShell.AltTimerTick(Sender: TObject);
+begin
+  FAltTimer.Enabled := False;
+  // No key release arrives from a terminal: Alt counts as released when no
+  // Alt key has come for a while, which closes Alt quick search and the
+  // directory-history popup.
+  SyncKeyModifiers(FHeldShift - [ssAlt]);
+  Recompose;
+end;
+
 procedure TTuiShell.DriveTimerTick(Sender: TObject);
 begin
   FDriveTimer.Enabled := False;
@@ -1033,6 +1052,10 @@ begin
     Exit;
   end;
   DispatchTerminalKey(Key, Ch, Shift);
+  FHeldShift := Shift;
+  FAltTimer.Enabled := False;
+  if ssAlt in Shift then
+    FAltTimer.Enabled := True;
   FDriveTimer.Enabled := False;
   if FDualPanel.DrivePreviewActive then
     FDriveTimer.Enabled := True;

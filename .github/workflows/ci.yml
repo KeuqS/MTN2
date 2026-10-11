@@ -161,6 +161,26 @@ jobs:
           path: dist/*.zip
           retention-days: 3
 
+      - name: Linux build, tests and package
+        # The terminal program for Linux: needs the Linux SDK and WSL on the
+        # runner; enabled by the repository variable LINUX_BUILD=true.
+        if: ${{ vars.LINUX_BUILD == 'true' }}
+        shell: pwsh
+        run: |
+          ./src/build-linux.ps1 -Rebuild
+          ./src/tests/run-tests-linux.ps1
+          $LinuxVersion = if ($env:DEV_VERSION) { $env:DEV_VERSION } else { "0.0.0-ci" }
+          ./src/tools/package-linux.ps1 -Version $LinuxVersion
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: ${{ vars.LINUX_BUILD == 'true' }}
+        with:
+          name: MTN2-linux-x64
+          path: |
+            dist/*-linux-x64.tar.gz
+            dist/*-linux-x64.deb
+          retention-days: 3
+
       - name: Check packages
         if: env.DEV_VERSION != ''
         shell: pwsh
@@ -175,6 +195,7 @@ jobs:
           if (-not $env:GH_TOKEN) { throw 'secret DEV_RELEASE_TOKEN is not set' }
           $Zips = @(Get-ChildItem dist -Filter *.zip | ForEach-Object FullName)
           if ($Zips.Count -ne 2) { throw "expected 2 packages in dist, found $($Zips.Count)" }
+          $Zips += @(Get-ChildItem dist -Filter '*-linux-x64.*' | ForEach-Object FullName)
 
           # A release needs a commit to tag: seed an empty repository.
           if ([int](gh api "repos/$env:DEV_REPO/branches" --jq length) -eq 0) {
