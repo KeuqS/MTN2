@@ -93,6 +93,7 @@ type
     FHelperActive: Boolean;
     FOnHelperActiveChanged: TNotifyEvent;
     FAlive: Boolean;
+    FLife: ILifeFlag;
     // Plugin picture shown in the Quick View panel (0 = none).
     FSurfacePanelHandle: Integer;
     FSurfacePanelGen: Cardinal;
@@ -1262,20 +1263,24 @@ const
   cHeaderFg    = TAlphaColor($FF55FFFF);
 
 constructor TDualPanelWindow.Create(const ATheme: IThemeRenderer; AId: Cardinal);
+var
+  Life: ILifeFlag;
 begin
   inherited Create(ATheme, AId);
+  FLife := NewLifeFlag;
   FAlive := True;
+  Life := FLife;
   FArchivesUnlocked := TDictionary<string, Boolean>.Create;
   ShellIconsSetOnReady(
     procedure
     begin
-      if FAlive then
+      if Life.Alive then
         NotifyChanged;
     end);
   FHostWindowId := BindHostInvalidate(
     procedure
     begin
-      if FAlive then
+      if Life.Alive then
         Invalidate;
     end);
   // NotifyChanged, not Invalidate: the hide comes from a timer, outside any
@@ -1283,7 +1288,7 @@ begin
   FToast := TToast.Create(
     procedure
     begin
-      if FAlive then
+      if Life.Alive then
         NotifyChanged;
     end);
   // Notices from anywhere (editor, command line, terminal, dialogs). Not
@@ -1292,12 +1297,12 @@ begin
   SetNoticeHandler(
     procedure(const ARequest: TNoticeRequest)
     begin
-      if FAlive and not FConsoleMode and Assigned(FToast) then
+      if Life.Alive and not FConsoleMode and Assigned(FToast) then
         FToast.ShowRequest(ARequest);
     end,
     procedure(const ATag: string)
     begin
-      if FAlive and Assigned(FToast) then
+      if Life.Alive and Assigned(FToast) then
         FToast.HideTag(ATag);
     end);
   FVfs := CreateDefaultVfs;
@@ -1422,6 +1427,7 @@ var
   Dir: string;
 begin
   FAlive := False;
+  FLife.Alive := False;
   if Assigned(FOpenTempDirs) then
   begin
     for Dir in FOpenTempDirs do
@@ -3655,8 +3661,10 @@ const
   // smallest encrypted file is enough to check the password.
   cProbeBytes = 64 * 1024;
 var
+  Life: ILifeFlag;
   Backend: IVirtualFileSystem;
 begin
+  Life := FLife;
   if not GlobalVfsRegistry.TryResolve(FArchiveProbeUri, Backend) then
   begin
     FArchiveAction := nil;
@@ -3667,7 +3675,7 @@ begin
     var
       Action: TProc;
     begin
-      if not FAlive or not Assigned(FArchiveAction) then
+      if not Life.Alive or not Assigned(FArchiveAction) then
         Exit;
       if AError.Code = vecAccessDenied then
       begin
@@ -4595,7 +4603,10 @@ begin
 end;
 
 procedure TDualPanelWindow.OpenOrNavigateAsync(const AURI: string);
+var
+  Life: ILifeFlag;
 begin
+  Life := FLife;
   if not AURI.StartsWith('file:', True) then
   begin
     NavigateActiveTo(AURI);
@@ -4605,7 +4616,7 @@ begin
     procedure(const AExists: Boolean; const AIsDirectory: Boolean;
       const AError: TVfsError)
     begin
-      if not FAlive then
+      if not Life.Alive then
         Exit;
       if AExists and (AError.Code = vecOk) and not AIsDirectory then
         ShellOpenPath(FileUriToPath(AURI))
@@ -5509,11 +5520,14 @@ end;
 
 procedure TDualPanelWindow.RunMkDir(const AVfs: IVirtualFileSystem;
   const AURI, ASelectName: string; AMayElevate: Boolean);
+var
+  Life: ILifeFlag;
 begin
+  Life := FLife;
   AVfs.CreateDirectoryAsync(AURI, nil,
     procedure(const ASuccess: Boolean; const AError: TVfsError)
     begin
-      if not FAlive then
+      if not Life.Alive then
         Exit;
       if ASuccess then
       begin
@@ -5634,9 +5648,11 @@ end;
 procedure TDualPanelWindow.ApplySetAttributes(const APaths: TArray<string>;
   const APlan: TFileAttrPlan);
 var
+  Life: ILifeFlag;
   CapturedPaths: TArray<string>;
   CapturedPlan: TFileAttrPlan;
 begin
+  Life := FLife;
   CapturedPaths := Copy(APaths);
   CapturedPlan := APlan;
   TThread.CreateAnonymousThread(
@@ -5649,7 +5665,7 @@ begin
       TThread.Queue(nil,
         procedure
         begin
-          if not FAlive then
+          if not Life.Alive then
             Exit;
           ReloadActiveRows;
           NotifyChanged;
@@ -5666,10 +5682,12 @@ end;
 procedure TDualPanelWindow.ConfirmCreateLink(const ALinkName, ATarget: string;
   AKind: TLinkKind);
 var
+  Life: ILifeFlag;
   Ws: TDualPanelWorkspaceTab;
   Side: TPanelSide;
   URI, LinkPath, TargetPath, CleanName, SelectName, ErrorMsg: string;
 begin
+  Life := FLife;
   if not TDualPanelOperationsController.ValidateFolderSegments(ALinkName, CleanName,
      SelectName, ErrorMsg) then
   begin
@@ -5707,7 +5725,7 @@ begin
       TThread.Queue(nil,
         procedure
         begin
-          if not FAlive then
+          if not Life.Alive then
             Exit;
           if not Ok then
           begin
@@ -5786,6 +5804,7 @@ end;
 
 procedure TDualPanelWindow.BeginCompareFiles;
 var
+  Life: ILifeFlag;
   Ws: TDualPanelWorkspaceTab;
   LeftRows, RightRows: TPanelRows;
   LeftTab, RightTab: TTab;
@@ -5795,6 +5814,7 @@ var
   LeftName, RightName: string;
   EitherSideNotAPlainFile: Boolean;
 begin
+  Life := FLife;
   if not CanStartOperation then
     Exit;
   Ws := ActiveWorkspace;
@@ -5827,7 +5847,7 @@ begin
     var
       Msg, Status: string;
     begin
-      if not FAlive then
+      if not Life.Alive then
         Exit;
       case AResult of
         crEqual:
@@ -5861,6 +5881,7 @@ end;
 
 procedure TDualPanelWindow.RestoreCursorItemFromRecycleBin;
 var
+  Life: ILifeFlag;
   Ws: TDualPanelWorkspaceTab;
   Panel: TPanelState;
   Tab: TTab;
@@ -5869,6 +5890,7 @@ var
   Idx: Integer;
   URI, Name: string;
 begin
+  Life := FLife;
   if Assigned(FDialog) and FDialog.Visible then
     Exit;
   if Assigned(FJobs) and FJobs.BlocksNewOperation then
@@ -5889,7 +5911,7 @@ begin
       TThread.Queue(nil,
         procedure
         begin
-          if not FAlive then
+          if not Life.Alive then
             Exit;
           if not Ok then
             OpenStub(skShellInfo, 'Restore failed', Err.Message)
@@ -5923,11 +5945,13 @@ end;
 
 procedure TDualPanelWindow.TmpRemoveSelected;
 var
+  Life: ILifeFlag;
   Sources: TArray<string>;
   Backend: IVirtualFileSystem;
   Remaining: Integer;
   I: Integer;
 begin
+  Life := FLife;
   Sources := CollectActiveSources;
   if Length(Sources) = 0 then
     Exit;
@@ -5941,7 +5965,7 @@ begin
         Dec(Remaining);
         if Remaining <> 0 then
           Exit;
-        if not FAlive then
+        if not Life.Alive then
           Exit;
         ReloadSidesShowing('tmp:///');
         NotifyChanged;
@@ -5950,6 +5974,7 @@ end;
 
 procedure TDualPanelWindow.WorkspaceUnlinkSelected;
 var
+  Life: ILifeFlag;
   Sources: TArray<string>;
   Backend: IVirtualFileSystem;
   Remaining: Integer;
@@ -5957,6 +5982,7 @@ var
   CurrentURI: string;
   Ws: TDualPanelWorkspaceTab;
 begin
+  Life := FLife;
   Sources := CollectActiveSources;
   if Length(Sources) = 0 then
     Exit;
@@ -5972,7 +5998,7 @@ begin
         Dec(Remaining);
         if Remaining <> 0 then
           Exit;
-        if not FAlive then
+        if not Life.Alive then
           Exit;
         ReloadSidesShowing(CurrentURI);
         NotifyChanged;
@@ -6163,9 +6189,11 @@ end;
 
 procedure TDualPanelWindow.ConfirmRename(const AName: string);
 var
+  Life: ILifeFlag;
   FromURI, ToURI, CleanName, DirURI, ErrorMsg: string;
   Side: TPanelSide;
 begin
+  Life := FLife;
   FromURI := FMenus.StubDetail;
   if FromURI = '' then
     Exit;
@@ -6191,7 +6219,7 @@ begin
     procedure(const AExists: Boolean; const AIsDirectory: Boolean;
       const AError: TVfsError)
     begin
-      if not FAlive then
+      if not Life.Alive then
         Exit;
       if AExists and (AError.Code = vecOk) and CanBeginAnotherJob then
       begin
@@ -6205,11 +6233,14 @@ end;
 
 procedure TDualPanelWindow.RunRename(const AVfs: IVirtualFileSystem;
   const AFromURI, AToURI, ANewName: string; AMayElevate: Boolean);
+var
+  Life: ILifeFlag;
 begin
+  Life := FLife;
   AVfs.MoveAsync(AFromURI, AToURI, nil, nil,
     procedure(const ASuccess: Boolean; const AError: TVfsError)
     begin
-      if not FAlive then
+      if not Life.Alive then
         Exit;
       if ASuccess then
       begin
@@ -6270,9 +6301,11 @@ end;
 
 procedure TDualPanelWindow.RequestFreeSpace(const APath: string);
 var
+  Life: ILifeFlag;
   Root, RootURI: string;
   Gen: Cardinal;
 begin
+  Life := FLife;
   Root := LocalPathRootOf(APath);
   if Root = '' then
   begin
@@ -6291,7 +6324,7 @@ begin
   FVfs.GetFreeSpaceAsync(RootURI, nil,
     procedure(const AFree, ATotal: Int64; const AError: TVfsError)
     begin
-      if not FAlive or (Gen <> FFreeGen) then
+      if not Life.Alive or (Gen <> FFreeGen) then
         Exit;
       if (AError.Code = vecOk) and (ATotal > 0) then
         FFreeText := T('status.free', 'Free %s', [FormatSizeShort(AFree)])
@@ -6304,8 +6337,10 @@ end;
 procedure TDualPanelWindow.ResolveRelativeCommandAsync(const AText, ABaseDir,
   ACommand: string);
 var
+  Life: ILifeFlag;
   Combined, URI, Cmd: string;
 begin
+  Life := FLife;
   Cmd := Trim(ACommand);
   if (Trim(AText) = '') or (ABaseDir = '') then
     Exit;
@@ -6315,7 +6350,7 @@ begin
     procedure(const AExists: Boolean; const AIsDirectory: Boolean;
       const AError: TVfsError)
     begin
-      if not FAlive then
+      if not Life.Alive then
         Exit;
       if AExists and (AError.Code = vecOk) then
       begin
@@ -7199,9 +7234,11 @@ end;
 // are purged after a day.
 procedure TDualPanelWindow.ShellOpenArchiveEntry(const AURI, AName: string);
 var
+  Life: ILifeFlag;
   Root, Dir, Dst, LeafName: string;
   Old: string;
 begin
+  Life := FLife;
   Root := TPath.Combine(TPath.GetTempPath, 'mtn2-open');
   try
     if TDirectory.Exists(Root) then
@@ -7228,7 +7265,7 @@ begin
   FVfs.CopyAsync(AURI, PathToFileUri(Dst), nil, nil,
     procedure(const ASuccess: Boolean; const AError: TVfsError)
     begin
-      if not FAlive then
+      if not Life.Alive then
         Exit;
       if ASuccess then
         ShellOpenPath(Dst)
@@ -7252,11 +7289,14 @@ end;
 // is repeated once.
 procedure TDualPanelWindow.ShellOpenSevenZipEntry(const ASevenUri, ADst: string;
   ARetried: Boolean);
+var
+  Life: ILifeFlag;
 begin
+  Life := FLife;
   FVfs.CopyAsync(ASevenUri, PathToFileUri(ADst), nil, nil,
     procedure(const ASuccess: Boolean; const AError: TVfsError)
     begin
-      if not FAlive then
+      if not Life.Alive then
         Exit;
       if ASuccess then
       begin
@@ -7369,11 +7409,13 @@ end;
 
 procedure TDualPanelWindow.StartChecksumJob(AAlgoIndex: Integer; AVerify: Boolean);
 var
+  Life: ILifeFlag;
   Token: IJobCancelToken;
   Paths: TArray<string>;
   Base, Title: string;
   Algo: TChecksumAlgo;
 begin
+  Life := FLife;
   Algo := TChecksumAlgo(EnsureRange(AAlgoIndex, 0, Ord(High(TChecksumAlgo))));
   Token := TJobCancelToken.Create;
   FChecksumToken := Token;
@@ -7455,7 +7497,7 @@ begin
         procedure
         begin
           // Cancelled (Esc on the stub, or the window is going away).
-          if Token.IsCancellationRequested or not FAlive then
+          if Token.IsCancellationRequested or not Life.Alive then
             Exit;
           FChecksumToken := nil;
           CloseStub;
@@ -7645,13 +7687,16 @@ begin
 end;
 
 procedure TDualPanelWindow.OfferElevated(const AAction: TProc);
+var
+  Life: ILifeFlag;
 begin
+  Life := FLife;
   if not ShowHostDialog(BuildConfirmDialog(
        T('ui.admin.title', 'Administrator rights'),
        T('ui.admin.confirm', 'Access denied. Repeat as administrator?')),
      procedure(ACmd, AValues: string)
      begin
-       if FAlive and DialogCmdIsAccept(ACmd) then
+       if Life.Alive and DialogCmdIsAccept(ACmd) then
          AAction();
      end) then
     Exit;
@@ -7660,8 +7705,10 @@ end;
 
 procedure TDualPanelWindow.AskElevationPassword(const ADone: TProc<Boolean>);
 var
+  Life: ILifeFlag;
   Decl: TDialogDeclaration;
 begin
+  Life := FLife;
   Decl := BuildArchivePasswordDialog(T('ui.admin.passwordFor', 'Administrator rights (sudo)'),
     T('ui.admin.passwordPrompt', 'Password:'));
   Decl.Title := T('ui.admin.passwordTitle', 'Administrator password');
@@ -7671,7 +7718,7 @@ begin
          Json: TJSONValue;
          Password: string;
        begin
-         if not FAlive or not DialogCmdIsAccept(ACmd) then
+         if not Life.Alive or not DialogCmdIsAccept(ACmd) then
          begin
            ADone(False);
            Exit;
@@ -7694,7 +7741,7 @@ begin
              TThread.Queue(nil,
                procedure
                begin
-                 if FAlive and not Accepted and Assigned(FToast) then
+                 if Life.Alive and not Accepted and Assigned(FToast) then
                    FToast.Show(T('ui.admin.passwordRejected', 'Password was not accepted'),
                      '', tkWarning);
                  ADone(Accepted);
@@ -8253,10 +8300,12 @@ end;
 
 procedure TDualPanelWindow.BeginBranchView;
 var
+  Life: ILifeFlag;
   RootPath: string;
   Opts: TFindOptions;
   Token: IJobCancelToken;
 begin
+  Life := FLife;
   if not CanStartOperation then
     Exit;
   RootPath := ActiveLocalPath;
@@ -8281,7 +8330,7 @@ begin
     var
       Sid: string;
     begin
-      if not FAlive then
+      if not Life.Alive then
         Exit;
       Sid := RegisterFindSession(RootPath, '*.*', AHits);
       NavigateActiveTo(MakeFindSessionUri(Sid));

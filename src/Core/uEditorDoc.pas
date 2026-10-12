@@ -53,6 +53,7 @@ type
     FError: string;
     FStatus: string;
     FGen: Cardinal;
+    FLife: ILifeFlag;
     FSaveGen: Cardinal;
     FCancel: IJobCancelToken;
     FOnChanged: TNotifyEvent;
@@ -189,6 +190,7 @@ uses
 constructor TEditorDoc.Create;
 begin
   inherited Create;
+  FLife := NewLifeFlag;
   FVfs := CreateDefaultVfs;
   FLines := TList<string>.Create;
   FLineCache := TDictionary<Integer, string>.Create;
@@ -204,6 +206,7 @@ end;
 
 destructor TEditorDoc.Destroy;
 begin
+  FLife.Alive := False;
   Close;
   if Assigned(FWatcher) then
   begin
@@ -428,9 +431,11 @@ end;
 
 procedure TEditorDoc.RefreshReadOnly;
 var
+  Life: ILifeFlag;
   Path: string;
   Gen: Cardinal;
 begin
+  Life := FLife;
   // Streaming docs are always view-only; StartStreamingOpen
   // already forces FReadOnly := True and never calls this method, but keep
   // the guard for any future caller.
@@ -468,7 +473,7 @@ begin
       TThread.Queue(nil,
         procedure
         begin
-          if Gen <> FGen then
+          if not Life.Alive or (Gen <> FGen) then
             Exit;
           FReadOnly := Ro;
           if FReady then
@@ -485,7 +490,10 @@ end;
 
 procedure TEditorDoc.StatFileAsync(const APath: string; AGen: Cardinal;
   const AOnDone: TFileStatCallback);
+var
+  Life: ILifeFlag;
 begin
+  Life := FLife;
   TThread.CreateAnonymousThread(
     procedure
     var
@@ -509,7 +517,7 @@ begin
       TThread.Queue(nil,
         procedure
         begin
-          if AGen <> FGen then
+          if not Life.Alive or (AGen <> FGen) then
             Exit;
           AOnDone(Ex, Sz, Wt);
         end);
@@ -654,11 +662,13 @@ end;
 // needed here.
 procedure TEditorDoc.ReloadFromDisk;
 var
+  Life: ILifeFlag;
   Gen: Cardinal;
   URI: string;
   Cancel: IJobCancelToken;
   MaxBytes: Int64;
 begin
+  Life := FLife;
   if not CanReloadFromDisk then
     Exit;
   Inc(FGen);
@@ -677,7 +687,7 @@ begin
       Enc: TTextFileEncoding;
       IsBin: Boolean;
     begin
-      if Gen <> FGen then
+      if not Life.Alive or (Gen <> FGen) then
         Exit;
       FCancel := nil;
       // A failed read, a decode failure, or content that now looks binary
@@ -880,10 +890,12 @@ end;
 
 procedure TEditorDoc.OpenAsync(const AURI: string; AWantEdit: Boolean);
 var
+  Life: ILifeFlag;
   Gen: Cardinal;
   URI: string;
   MaxBytes: Int64;
 begin
+  Life := FLife;
   Close;
   URI := AURI;
   FURI := URI;
@@ -912,7 +924,7 @@ begin
       Enc: TTextFileEncoding;
       IsBin: Boolean;
     begin
-      if Gen <> FGen then
+      if not Life.Alive or (Gen <> FGen) then
         Exit;
       // A plain local file that's too big for the whole-buffer
       // read gets a second chance as a streaming (line-indexed) doc instead
@@ -1222,8 +1234,10 @@ end;
 
 procedure TEditorDoc.StartStreamingOpen(const APath: string; AGen: Cardinal);
 var
+  Life: ILifeFlag;
   Cancel: IJobCancelToken;
 begin
+  Life := FLife;
   FStatus := 'Indexing...';
   NotifyChanged;
   FCancel := TJobCancelToken.Create;
@@ -1243,7 +1257,7 @@ begin
       TThread.Queue(nil,
         procedure
         begin
-          if AGen <> FGen then
+          if not Life.Alive or (AGen <> FGen) then
             Exit;
           FLoading := False;
           FCancel := nil;
@@ -1305,9 +1319,11 @@ end;
   that temp path to StartStreamingOpen unchanged. }
 procedure TEditorDoc.StartStreamingOpenFromArchive(const AURI: string; AGen: Cardinal);
 var
+  Life: ILifeFlag;
   TempPath: string;
   Cancel: IJobCancelToken;
 begin
+  Life := FLife;
   FStatus := 'Extracting...';
   NotifyChanged;
   TempPath := TPath.GetTempFileName;
@@ -1318,7 +1334,7 @@ begin
       const AItemDone, AItemTotal: Int64; const AItemSrcPath, AItemDstPath: string) begin end,
     procedure(const ASuccess: Boolean; const AError: TVfsError)
     begin
-      if AGen <> FGen then
+      if not Life.Alive or (AGen <> FGen) then
         Exit;
       if not ASuccess then
       begin
@@ -1434,11 +1450,13 @@ end;
 
 procedure TEditorDoc.SaveAsync(ARawBytes: Boolean);
 var
+  Life: ILifeFlag;
   SaveGen: Cardinal;
   URI, Text, Path: string;
   Enc: TTextFileEncoding;
   Raw: TBytes;
 begin
+  Life := FLife;
   if (not FReady) or FSaving or FLoading then
     Exit;
   if FStreaming then
@@ -1497,7 +1515,7 @@ begin
         TThread.Queue(nil,
           procedure
           begin
-            if SaveGen <> FSaveGen then
+            if not Life.Alive or (SaveGen <> FSaveGen) then
               Exit;
             FSaving := False;
             if not Ok then
@@ -1534,7 +1552,7 @@ begin
   FVfs.WriteTextAsync(URI, Text, Enc, FCancel,
     procedure(const ASuccess: Boolean; const AError: TVfsError)
     begin
-      if SaveGen <> FSaveGen then
+      if not Life.Alive or (SaveGen <> FSaveGen) then
         Exit;
       FSaving := False;
       FCancel := nil;

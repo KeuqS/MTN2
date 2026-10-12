@@ -23,7 +23,7 @@ type
     FOnAfterClose: TProc;
     FOnStopRequest: TProc;
     FSearch: TSearchState;
-    FAlive: Boolean;
+    FLife: ILifeFlag;
     procedure HandleSearchInputDialog(var AKey: Word; AShift: TShiftState;
       var AKeyChar: Char);
     procedure HandleSearchInputRunning(var AKey: Word; var AKeyChar: Char);
@@ -99,7 +99,7 @@ begin
   FOnGoto := AOnGoto;
   FOnNavigateFindResults := AOnNavigateFindResults;
   FOnAfterClose := AOnAfterClose;
-  FAlive := True;
+  FLife := NewLifeFlag;
   FSearch.Phase := spNone;
   FSearch.Mask := '*.*';
   FSearch.ContainingText := '';
@@ -113,7 +113,7 @@ end;
 
 destructor TSearchController.Destroy;
 begin
-  FAlive := False;
+  FLife.Alive := False;
   if Assigned(FSearch.Cancel) then
     FSearch.Cancel.Cancel;
   inherited;
@@ -183,6 +183,7 @@ var
   Mask, Root, RegexError: string;
   Token: IJobCancelToken;
   Opts: TFindOptions;
+  Life: ILifeFlag;
 begin
   Mask := Trim(FSearch.Mask);
   if Mask = '' then
@@ -215,6 +216,7 @@ begin
     Exit;
   end;
 
+  Life := FLife;
   Token := TJobCancelToken.Create;
   FSearch.Cancel := Token;
   FSearch.Phase := spRunning;
@@ -235,7 +237,7 @@ begin
   FindFilesAsync(Opts, Token,
     procedure(AFoundCount: Integer; const ACurrentDir: string)
     begin
-      if not FAlive or (FSearch.Phase <> spRunning) then
+      if not Life.Alive or (FSearch.Phase <> spRunning) then
         Exit;
       FSearch.FoundCount := AFoundCount;
       FSearch.CurrentDir := ACurrentDir;
@@ -244,7 +246,7 @@ begin
     end,
     procedure(const AHits: TArray<TFindHit>; const AError: TVfsError)
     begin
-      if not FAlive then
+      if not Life.Alive then
         Exit;
       if FSearch.Phase <> spRunning then
         Exit;

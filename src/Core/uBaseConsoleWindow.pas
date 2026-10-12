@@ -15,7 +15,7 @@ uses
   uClipboardService,
   uPlatformInfo,
   uTerminalTypes, uThemeTypes, uThemeDrawing, uTerminalWindow, uConsoleBuffer, uConPty,
-  uShellProfiles, uShellProfileOptions, uTerminalKeys, uDialogTypes, uDialogHost,
+  uVfsTypes, uShellProfiles, uShellProfileOptions, uTerminalKeys, uDialogTypes, uDialogHost,
   uInputLine, uKeyChord, uConsoleSettings;
 
 type
@@ -62,6 +62,7 @@ type
     FDialog:        TDialogHost;
     { Subclass-accessible state. }
     FAlive:         Boolean;
+    FLife:          ILifeFlag;
     FRunning:       Boolean;
     FProfileId:     string;
     FCallbackGen:   Integer;
@@ -282,6 +283,7 @@ constructor TBaseConsoleWindow.Create(const ATheme: IThemeRenderer;
 begin
   inherited Create(ATheme, AId);
   FAlive              := True;
+  FLife               := NewLifeFlag;
   FHistory            := TConsoleBuffer.Create;
   FPty                := TConPtySession.Create;
   FRunning            := False;
@@ -305,6 +307,7 @@ end;
 destructor TBaseConsoleWindow.Destroy;
 begin
   FAlive := False;
+  FLife.Alive := False;
   Inc(FCallbackGen);
   if Assigned(FPty) then
   begin
@@ -505,6 +508,7 @@ end;
 procedure TBaseConsoleWindow.NotifyHostThrottled;
 var
   Gen: Integer;
+  Life: ILifeFlag;
 begin
   FNotifyDirty := True;
   if (PlatformTickCount64 - FLastNotifyTick) >= cMinNotifyMs then
@@ -516,6 +520,7 @@ begin
     Exit;
   FNotifyFlushQueued := True;
   Gen := FCallbackGen;
+  Life := FLife;
   TThread.CreateAnonymousThread(
     procedure
     begin
@@ -523,6 +528,8 @@ begin
       TThread.Synchronize(nil,
         procedure
         begin
+          if not Life.Alive then
+            Exit;
           FNotifyFlushQueued := False;
           if FAlive and (Gen = FCallbackGen) and FNotifyDirty then
             NotifyHost;

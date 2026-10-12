@@ -17,6 +17,7 @@ type
   private
     FCancelToken: IJobCancelToken;
     FGen: Cardinal;
+    FLife: ILifeFlag;
     FURI: string;
     FSide: TPanelSide;
     FQueue: TArray<string>;
@@ -50,6 +51,7 @@ constructor TFolderSizeCalculationManager.Create(
   const AOnProgress: TFolderSizeProgressEvent; const AOnInvalidate: TProc);
 begin
   inherited Create;
+  FLife := NewLifeFlag;
   FOnProgress := AOnProgress;
   FOnInvalidate := AOnInvalidate;
   Reset;
@@ -57,6 +59,7 @@ end;
 
 destructor TFolderSizeCalculationManager.Destroy;
 begin
+  FLife.Alive := False;
   Cancel;
   inherited Destroy;
 end;
@@ -93,6 +96,7 @@ procedure TFolderSizeCalculationManager.StartCalculation(ASide: TPanelSide;
 var
   CapGen: Cardinal;
   CapSide: TPanelSide;
+  Life: ILifeFlag;
   I: Integer;
 
   procedure EnqueueOne(const AFolderURI: string);
@@ -116,7 +120,7 @@ var
         TThread.Queue(nil,
           procedure
           begin
-            if FGen <> CapGen then
+            if not Life.Alive or (FGen <> CapGen) then
               Exit;
             if DoneOk then
               Inc(FSumBytes, DoneBytes)
@@ -136,6 +140,7 @@ begin
   Cancel;
   Inc(FGen);
   CapGen := FGen;
+  Life := FLife;
   FSide := ASide;
   CapSide := ASide;
   FURI := AURI;

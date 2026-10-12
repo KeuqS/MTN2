@@ -62,6 +62,17 @@ type
   /// <summary>vdmRecycleBin = Windows Recycle Bin (FOF_ALLOWUNDO); else permanent.</summary>
   TVfsDeleteMode = (vdmRecycleBin, vdmPermanent);
 
+  /// <summary>Liveness flag shared by an object and the closures it queues
+  /// to the main thread or hands to worker threads. Such a closure can run
+  /// after the object is freed, so it tests the flag (kept alive by the
+  /// closure) before touching any field of the object.</summary>
+  ILifeFlag = interface
+    ['{9D2B6E41-5A07-4C38-B1F6-0E83A7D4C259}']
+    function GetAlive: Boolean;
+    procedure SetAlive(AValue: Boolean);
+    property Alive: Boolean read GetAlive write SetAlive;
+  end;
+
   IJobCancelToken = interface
     ['{C3E1A7D0-2F4B-4A9E-9C11-6B0E8D2A1F40}']
     function IsCancellationRequested: Boolean;
@@ -201,6 +212,8 @@ function SameVfsUri(const A, B: string): Boolean;
 /// loops compare against many URIs by hashing/sorting instead of O(N*M)
 /// SameVfsUri calls.</summary>
 function VfsUriKey(const AURI: string): string;
+/// <summary>A new flag, already set to alive.</summary>
+function NewLifeFlag: ILifeFlag;
 function JoinVfsUri(const ADirURI, AName: string): string;
 function ParentVfsUri(const AURI: string): string;
 function VfsUriTitle(const AURI: string): string;
@@ -1374,6 +1387,30 @@ begin
   end
   else
     Result := S + '!/';
+end;
+
+type
+  TLifeFlag = class(TInterfacedObject, ILifeFlag)
+  private
+    FAlive: Boolean;
+    function GetAlive: Boolean;
+    procedure SetAlive(AValue: Boolean);
+  end;
+
+function TLifeFlag.GetAlive: Boolean;
+begin
+  Result := FAlive;
+end;
+
+procedure TLifeFlag.SetAlive(AValue: Boolean);
+begin
+  FAlive := AValue;
+end;
+
+function NewLifeFlag: ILifeFlag;
+begin
+  Result := TLifeFlag.Create;
+  Result.Alive := True;
 end;
 
 function JoinVfsUri(const ADirURI, AName: string): string;

@@ -135,6 +135,7 @@ type
     FSelAnchorCol: Integer;
     FCursorVisible: Boolean;
     FAlive: Boolean;
+    FLife: ILifeFlag;
     FConfirm: TEditorConfirm;
     FPendingEncoding: TTextFileEncoding;
     FDialog: TDialogHost;
@@ -441,6 +442,7 @@ constructor TEditorWindow.Create(const ATheme: IThemeRenderer; AId: Cardinal);
 begin
   inherited Create(ATheme, AId);
   FAlive := True;
+  FLife := NewLifeFlag;
   FDoc := TEditorDoc.Create;
   FDoc.OnChanged := DocChanged;
   FDialog := TDialogHost.Create(ATheme);
@@ -792,6 +794,7 @@ end;
 destructor TEditorWindow.Destroy;
 begin
   FAlive := False;
+  FLife.Alive := False;
   if FSurfaceHandle <> 0 then
   begin
     SurfaceTabClosed(FSurfaceHandle);
@@ -828,9 +831,11 @@ procedure TEditorWindow.DocChanged(Sender: TObject);
 var
   Star: string;
   JustRestored, Replaced: Boolean;
+  Life: ILifeFlag;
 begin
   if not FAlive then
     Exit;
+  Life := FLife;
   // A live reload (FDoc's own file-watcher) replaces the document's content
   // without going through Open, so the markdown fence index / line cache -
   // keyed by line index into content that just changed underneath - would
@@ -911,7 +916,7 @@ begin
     TThread.ForceQueue(nil,
       procedure
       begin
-        if not FAlive then
+        if not Life.Alive then
           Exit;
         FChangedEventQueued := False;
         PluginPublishEvent('doc.changed', PluginUriPayload(FURI));
