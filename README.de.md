@@ -11,9 +11,40 @@ nehmen zwei Spalten ein, genau wie in anderen modernen Terminals.
 [![CI](https://github.com/Laex/MTN2/actions/workflows/ci.yml/badge.svg)](https://github.com/Laex/MTN2/actions/workflows/ci.yml)
 [![License: MPL-2.0](https://img.shields.io/badge/license-MPL--2.0-blue.svg)](LICENSE)
 
-![MTN2: zwei Panels und Über-Dialog](docs/images/mtn2-about.png)
+![MTN2: Panels mit Tabs](docs/images/mtn2-panels.png)
 
-Neuerungen in den Versionen – siehe [CHANGELOG.md](CHANGELOG.md).
+[Neueste Version herunterladen](https://github.com/Laex/MTN2/releases/latest) ·
+[Neuerungen](CHANGELOG.md) · [FAQ](docs/FAQ.md) (auf Russisch) ·
+[Diskussionen](https://github.com/Laex/MTN2/discussions) ·
+[Artikel auf Habr](https://habr.com/ru/articles/1087174/) (auf Russisch)
+
+MTN2 ist für Menschen gedacht, die mit DOS Navigator und Far Manager aufgewachsen sind und von der Tastatur aus arbeiten:
+System- und Netzwerkadministratoren, Entwickler. Es ersetzt Far Manager nicht und konkurriert nicht mit Total Commander,
+sondern ist ein weiterer Zweipanel-Manager mit eigenen Gewohnheiten.
+
+## Grundsätze
+
+- **Keine Telemetrie, keine Cloud-Funktionen.** Der einzige Netzzugriff ist die Prüfung auf eine neue Version bei GitHub
+  (einmal täglich beim Start); abschaltbar unter **≡ → Nach Updates suchen...** („Beim Start nach Updates suchen“).
+- **Portabel.** Ein Ordner, kein Installer, keine Registry-Einträge; die portable Version legt ihre Einstellungen neben
+  `MTN2.exe` ab, die normale in `%APPDATA%\MTN2`. Einstellungen, Themes und Tastenbelegung sind einfache JSON-Dateien.
+- **Tastatur zuerst.** Die Belegung ähnelt Far Manager und ist frei änderbar; Tabs und Terminals funktionieren wie in ConEmu.
+- **Ein echtes Terminal.** Die Konsole läuft auf ConPTY (cmd, PowerShell, WSL, SSH), keine Nachbildung.
+- **Erweiterbar.** Native und WebAssembly-Plugins: eigene Dateisysteme, Panels, Befehle, Dialoge, Textfärbung.
+
+> Der Habr-Artikel löst den Namen als Modern Turbo Navigator auf; der aktuelle Name lautet **Modern Terminal Navigator**.
+
+
+## Screenshots
+
+| | |
+|---|---|
+| ![Zwei Panels mit Tabs](docs/images/mtn2-panels.png) | ![Archiv als Ordner](docs/images/mtn2-archive.png) |
+| Panels mit Tabs, Theme Far Classic | Ein Archiv öffnet sich als Ordner |
+| ![Markdown-Anzeige](docs/images/mtn2-markdown.png) | ![Editor mit JSON-Hervorhebung](docs/images/mtn2-editor.png) |
+| Markdown-Anzeige mit Tabellen | Editor; die Hervorhebung kommt von einem Plugin |
+| ![Integrierte Konsole](docs/images/mtn2-console.png) | ![Theme Dracula](docs/images/mtn2-dracula.png) |
+| Integrierte Konsole (Strg+O) | Theme Dracula |
 
 ## Funktionen
 
@@ -42,7 +73,11 @@ Neuerungen in den Versionen – siehe [CHANGELOG.md](CHANGELOG.md).
 
 Unterstützt werden Windows x64 (grafische Anwendung) und Linux x86-64: `mtn2-tui` nutzt das gesamte Textterminal,
 bietet dieselben Panels, Viewer, Editor, Konsole und Plugins und funktioniert über SSH sowie in `tmux` (siehe [docs/LINUX.md](docs/LINUX.md)).
-Eine grafische Version für Linux und ein macOS-Build sind in Planung.
+Die experimentelle grafische Linux-Version `mtn2-sdl` zeigt dieselben Fenster in einem normalen SDL2-Fenster:
+Systemschrift, Maus und Mausrad, Eingabe in jeder Tastaturbelegung, Zwischenablage des Desktops, Bilder in der
+Schnellansicht. Sie läuft unter X11 und Wayland (in Windows über WSLg), liegt den Paketen `tar.gz` und `.deb` bei und
+braucht `libSDL2` und `libfreetype` (für PNG und JPEG zusätzlich `libSDL2_image`): Abhängigkeiten und Parameter
+stehen in [docs/LINUX.md](docs/LINUX.md) (auf Russisch). Ein macOS-Build ist in Planung.
 
 ## Installation
 
@@ -50,13 +85,18 @@ Fertige Builds stehen auf der [Releases](https://github.com/Laex/MTN2/releases)-
 
 - `MTN2-<version>-win64.zip` – Einstellungen und Verlauf werden in `%APPDATA%\MTN2` gespeichert;
 - `MTN2-<version>-win64-portable.zip` – portable Version: alles wird direkt neben `MTN2.exe` abgelegt;
-- `MTN2-<version>-linux-x64.tar.gz` und `MTN2-<version>-linux-x64.deb` – Version für das Linux-Terminal (`mtn2-tui`):
+- `MTN2-<version>-linux-x64.tar.gz` und `MTN2-<version>-linux-x64.deb` – Version für Linux: `mtn2-tui` (im Terminalfenster,
+  funktioniert über SSH) und die experimentelle grafische `mtn2-sdl` (SDL2-Fenster, braucht `libSDL2` und `libfreetype`):
   Installation, Abhängigkeiten und Parameter – siehe [docs/LINUX.md](docs/LINUX.md).
 
-Das Archiv einfach in einen beliebigen Ordner entpacken und `MTN2.exe` starten. Danach aktualisiert sich das Programm selbst
+**Windows:** Das Archiv einfach in einen beliebigen Ordner entpacken und `MTN2.exe` starten. Danach aktualisiert sich das Programm selbst
 (Menü **≡ → Nach Updates suchen...**). Das Paket enthält `7z.dll` aus [7-Zip](https://www.7-zip.org) (GNU LGPL; Lizenztexte in
 `plugins\mtn.7z\license.txt`, Details in [THIRD-PARTY.md](THIRD-PARTY.md)): damit lassen sich 7z- und andere
 7-Zip-Archive öffnen. Sie kann durch eine eigene x64-Version in `plugins\mtn.7z\` ersetzt werden; zip lässt sich auch ohne sie öffnen.
+
+**Linux:** `tar xzf MTN2-*-linux-x64.tar.gz && ./mtn2/install.sh` (für alle Benutzer mit `sudo`) oder
+`sudo apt install ./MTN2-*-linux-x64.deb`. Danach startet `mtn2` die Terminalversion und `mtn2-sdl` das SDL2-Fenster.
+Der entpackte Ordner läuft auch ohne Installation: `mtn2/mtn2-tui` und `mtn2/mtn2-sdl` starten dort, wo sie liegen.
 
 ### Dev-Builds
 

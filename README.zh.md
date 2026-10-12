@@ -7,9 +7,36 @@
 [![CI](https://github.com/Laex/MTN2/actions/workflows/ci.yml/badge.svg)](https://github.com/Laex/MTN2/actions/workflows/ci.yml)
 [![License: MPL-2.0](https://img.shields.io/badge/license-MPL--2.0-blue.svg)](LICENSE)
 
-![MTN2：双面板与“关于”窗口](docs/images/mtn2-about.png)
+![MTN2：带标签页的双面板](docs/images/mtn2-panels.png)
 
-各版本的更新内容请参阅 [CHANGELOG.md](CHANGELOG.md)。
+[下载最新版本](https://github.com/Laex/MTN2/releases/latest) ·
+[更新日志](CHANGELOG.md) · [常见问题](docs/FAQ.md)（俄语） ·
+[讨论区](https://github.com/Laex/MTN2/discussions) ·
+[Habr 文章](https://habr.com/ru/articles/1087174/)（俄语）
+
+MTN2 面向在 DOS Navigator 与 Far Manager 陪伴下成长、习惯用键盘工作的人：系统与网络工程师、开发者、管理员。它不取代 Far Manager，也不与 Total Commander 竞争，只是又一个有自己使用习惯的双面板管理器。
+
+## 设计原则
+
+- **无遥测、无云端功能。** 唯一的网络访问是向 GitHub 检查新版本（每天启动时一次）；可在 **≡ → 检查更新...** 中关闭（“启动时检查更新”）。
+- **便携。** 单个目录，无需安装程序，不写注册表；便携版的设置保存在 `MTN2.exe` 同级目录，普通版保存在 `%APPDATA%\MTN2`。设置、主题与快捷键映射均为普通 JSON 文件。
+- **键盘优先。** 快捷键布局接近 Far Manager，可完全自定义；标签页与终端的用法类似 ConEmu。
+- **真正的终端。** 控制台基于 ConPTY（cmd、PowerShell、WSL、SSH），而非模拟。
+- **可扩展。** 原生与 WebAssembly 插件：自定义文件系统、面板、命令、对话框、文本着色。
+
+> Habr 文章将名称解释为 Modern Turbo Navigator；当前名称为 **Modern Terminal Navigator**。
+
+
+## 截图
+
+| | |
+|---|---|
+| ![带标签页的双面板](docs/images/mtn2-panels.png) | ![压缩包作为文件夹](docs/images/mtn2-archive.png) |
+| 带标签页的面板，Far Classic 主题 | 压缩包可作为文件夹打开 |
+| ![Markdown 查看器](docs/images/mtn2-markdown.png) | ![带 JSON 高亮的编辑器](docs/images/mtn2-editor.png) |
+| 支持表格的 Markdown 查看器 | 编辑器；高亮由插件提供 |
+| ![内置控制台](docs/images/mtn2-console.png) | ![Dracula 主题](docs/images/mtn2-dracula.png) |
+| 内置控制台（Ctrl+O） | Dracula 主题 |
 
 ## 功能特性
 
@@ -24,18 +51,20 @@
 - **插件系统：** 原生 DLL 与 WebAssembly（基于 Wasmtime）—— 支持自定义 VFS 方案及专属面板、菜单项、按键绑定、消息总线。已定义对话框、覆盖层与状态栏的插件协议，目前由主程序内部使用——详见 [PLUGIN_BOUNDARIES](docs/PLUGIN_BOUNDARIES.md)。
 - **自动更新：** 每日自动检查 GitHub 上的新版本；下载（包含 SHA-256 校验）、安装及重启均需用户确认。菜单入口：**≡ → 检查更新...**。
 
-支持 Windows x64（图形界面程序）与 Linux x86-64：`mtn2-tui` 运行在全屏文本终端中，拥有完全相同的面板、查看器、编辑器、控制台与插件，支持 SSH 远程连接与 `tmux`（参见 [docs/LINUX.md](docs/LINUX.md)）。Linux 图形界面版本与 macOS 构建已在规划中。
+支持 Windows x64（图形界面程序）与 Linux x86-64：`mtn2-tui` 运行在全屏文本终端中，拥有完全相同的面板、查看器、编辑器、控制台与插件，支持 SSH 远程连接与 `tmux`（参见 [docs/LINUX.md](docs/LINUX.md)）。实验性的 Linux 图形界面版本 `mtn2-sdl` 在普通 SDL2 窗口中显示相同的窗口：使用系统字体，支持鼠标与滚轮、任意键盘布局输入、桌面剪贴板，以及快速预览中的图片。它可运行于 X11 与 Wayland（Windows 下通过 WSLg），包含在 `tar.gz` 与 `.deb` 软件包中，需要 `libSDL2` 与 `libfreetype`（PNG 和 JPEG 另需 `libSDL2_image`）：依赖项与参数详见 [docs/LINUX.md](docs/LINUX.md)（俄语）。macOS 构建已在规划中。
 
 ## 安装指南
 
 预编译版本可在 [Releases](https://github.com/Laex/MTN2/releases) 页面下载：
 
-- `MTN2-<版本>-win64.zip` —— 配置和历史记录保存在 `%APPDATA%\MTN2`；
-- `MTN2-<版本>-win64-portable.zip` —— 便携版：所有内容均存放在 `MTN2.exe` 同级目录下；
-- `MTN2-<版本>-linux-x64.tar.gz` 与 `MTN2-<版本>-linux-x64.deb` —— Linux 终端版本（`mtn2-tui`）：
+- `MTN2-<版本>-win64.zip` – 配置和历史记录保存在 `%APPDATA%\MTN2`；
+- `MTN2-<版本>-win64-portable.zip` – 便携版：所有内容均存放在 `MTN2.exe` 同级目录下；
+- `MTN2-<版本>-linux-x64.tar.gz` 与 `MTN2-<版本>-linux-x64.deb` – Linux 版本：`mtn2-tui`（在终端窗口内运行，支持 SSH）与实验性的图形版 `mtn2-sdl`（SDL2 窗口，需要 `libSDL2` 与 `libfreetype`）：
   安装指南、依赖项与参数说明详见 [docs/LINUX.md](docs/LINUX.md)。
 
-只需解压至任意文件夹并运行 `MTN2.exe` 即可。之后程序支持自动更新（菜单 **≡ → 检查更新...**）。发布包中包含来自 [7-Zip](https://www.7-zip.org) 的 `7z.dll`（GNU LGPL 许可；许可证文本位于 `plugins\mtn.7z\license.txt`，详情参阅 [THIRD-PARTY.md](THIRD-PARTY.md)），用于打开 7z 及其他 7-Zip 支持的格式。可在 `plugins\mtn.7z\` 中替换为您自己的 x64 版本；zip 格式无需此 DLL 即可原生打开。
+**Windows：** 只需解压至任意文件夹并运行 `MTN2.exe` 即可。之后程序支持自动更新（菜单 **≡ → 检查更新...**）。发布包中包含来自 [7-Zip](https://www.7-zip.org) 的 `7z.dll`（GNU LGPL 许可；许可证文本位于 `plugins\mtn.7z\license.txt`，详情参阅 [THIRD-PARTY.md](THIRD-PARTY.md)），用于打开 7z 及其他 7-Zip 支持的格式。可在 `plugins\mtn.7z\` 中替换为您自己的 x64 版本；zip 格式无需此 DLL 即可原生打开。
+
+**Linux：** `tar xzf MTN2-*-linux-x64.tar.gz && ./mtn2/install.sh`（为所有用户安装请加 `sudo`），或 `sudo apt install ./MTN2-*-linux-x64.deb`。安装后 `mtn2` 启动终端版，`mtn2-sdl` 启动 SDL2 窗口。解压后的文件夹也可免安装运行：`mtn2/mtn2-tui` 与 `mtn2/mtn2-sdl` 可就地启动。
 
 ### 开发版构建（Dev Builds）
 

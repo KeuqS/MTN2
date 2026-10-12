@@ -11,9 +11,36 @@ TrueType 폰트, 유니코드 및 32비트 트루컬러를 지원하는 Delphi F
 [![CI](https://github.com/Laex/MTN2/actions/workflows/ci.yml/badge.svg)](https://github.com/Laex/MTN2/actions/workflows/ci.yml)
 [![License: MPL-2.0](https://img.shields.io/badge/license-MPL--2.0-blue.svg)](LICENSE)
 
-![MTN2: 듀얼 패널 및 프로그램 정보 창](docs/images/mtn2-about.png)
+![MTN2: 탭이 있는 듀얼 패널](docs/images/mtn2-panels.png)
 
-버전별 변경 사항은 [CHANGELOG.md](CHANGELOG.md)에서 확인하실 수 있습니다.
+[최신 버전 다운로드](https://github.com/Laex/MTN2/releases/latest) ·
+[변경 사항](CHANGELOG.md) · [FAQ](docs/FAQ.md)(러시아어) ·
+[토론](https://github.com/Laex/MTN2/discussions) ·
+[Habr 기사](https://habr.com/ru/articles/1087174/)(러시아어)
+
+MTN2는 DOS Navigator와 Far Manager와 함께 자랐고 키보드로 작업하는 사람들을 위한 프로그램입니다: 시스템·네트워크 엔지니어, 개발자, 관리자. Far Manager를 대체하지 않으며 Total Commander와 경쟁하지도 않습니다. 나름의 습관을 가진 또 하나의 듀얼 패널 관리자일 뿐입니다.
+
+## 원칙
+
+- **텔레메트리와 클라우드 기능 없음.** 유일한 네트워크 접근은 GitHub에서 새 버전을 확인하는 것입니다(시작 시 하루 한 번). **≡ → 업데이트 확인...**에서 끌 수 있습니다("시작 시 업데이트 확인").
+- **휴대성.** 폴더 하나, 설치 프로그램 없음, 레지스트리 기록 없음. 포터블 버전은 설정을 `MTN2.exe` 옆에, 일반 버전은 `%APPDATA%\MTN2`에 저장합니다. 설정, 테마, 단축키 매핑은 일반 JSON 파일입니다.
+- **키보드 우선.** 단축키 배치는 Far Manager와 비슷하며 자유롭게 바꿀 수 있습니다. 탭과 터미널은 ConEmu처럼 동작합니다.
+- **진짜 터미널.** 콘솔은 흉내가 아니라 ConPTY(cmd, PowerShell, WSL, SSH) 위에서 동작합니다.
+- **확장성.** 네이티브 및 WebAssembly 플러그인: 사용자 파일 시스템, 패널, 명령, 대화 상자, 텍스트 색상 강조.
+
+> Habr 기사에서는 이름을 Modern Turbo Navigator로 풀이했습니다. 현재 이름은 **Modern Terminal Navigator**입니다.
+
+
+## 스크린샷
+
+| | |
+|---|---|
+| ![탭이 있는 듀얼 패널](docs/images/mtn2-panels.png) | ![폴더로 열린 압축 파일](docs/images/mtn2-archive.png) |
+| 탭이 있는 패널, Far Classic 테마 | 압축 파일이 폴더처럼 열립니다 |
+| ![Markdown 뷰어](docs/images/mtn2-markdown.png) | ![JSON 강조가 있는 에디터](docs/images/mtn2-editor.png) |
+| 표를 지원하는 Markdown 뷰어 | 에디터. 강조는 플러그인이 제공합니다 |
+| ![내장 콘솔](docs/images/mtn2-console.png) | ![Dracula 테마](docs/images/mtn2-dracula.png) |
+| 내장 콘솔(Ctrl+O) | Dracula 테마 |
 
 ## 주요 기능
 
@@ -41,7 +68,7 @@ TrueType 폰트, 유니코드 및 32비트 트루컬러를 지원하는 Delphi F
 
 Windows x64(GUI 애플리케이션) 및 Linux x86-64를 지원합니다: `mtn2-tui`는 전체 텍스트 터미널에서 실행되며,
 동일한 패널, 뷰어, 에디터, 콘솔 및 플러그인을 제공하고 SSH 및 `tmux` 환경에서도 작동합니다([docs/LINUX.md](docs/LINUX.md) 참조).
-Linux용 GUI 버전 및 macOS 빌드는 향후 지원 예정입니다.
+실험적인 Linux GUI 버전 `mtn2-sdl`은 같은 창을 일반 SDL2 창에서 보여 줍니다: 시스템 글꼴, 마우스와 휠, 모든 키보드 배열 입력, 데스크톱 클립보드, 빠른 보기의 이미지. X11 및 Wayland(Windows에서는 WSLg)에서 실행되고 `tar.gz` 및 `.deb` 패키지에 포함되며 `libSDL2`와 `libfreetype`이 필요합니다(PNG와 JPEG는 `libSDL2_image` 추가): 의존성과 옵션은 [docs/LINUX.md](docs/LINUX.md)(러시아어)를 참조하십시오. macOS 빌드는 향후 지원 예정입니다.
 
 ## 설치
 
@@ -49,11 +76,16 @@ Linux용 GUI 버전 및 macOS 빌드는 향후 지원 예정입니다.
 
 - `MTN2-<버전>-win64.zip` – 설정 및 히스토리가 `%APPDATA%\MTN2`에 저장됩니다.
 - `MTN2-<버전>-win64-portable.zip` – 포터블 버전: 모든 데이터가 `MTN2.exe`와 같은 폴더에 저장됩니다;
-- `MTN2-<버전>-linux-x64.tar.gz` 및 `MTN2-<버전>-linux-x64.deb` – Linux 터미널 버전(`mtn2-tui`):
+- `MTN2-<버전>-linux-x64.tar.gz` 및 `MTN2-<버전>-linux-x64.deb` – Linux 버전: `mtn2-tui`(터미널 창 안에서 실행, SSH 지원)와
+  실험적인 GUI 버전 `mtn2-sdl`(SDL2 창, `libSDL2`와 `libfreetype` 필요):
   설치 방법, 의존성 및 옵션은 [docs/LINUX.md](docs/LINUX.md)를 참조하십시오.
 
-압축을 임의의 폴더에 풀고 `MTN2.exe`를 실행하기만 하면 됩니다. 이후에는 프로그램이 자체적으로 업데이트됩니다
+**Windows:** 압축을 임의의 폴더에 풀고 `MTN2.exe`를 실행하기만 하면 됩니다. 이후에는 프로그램이 자체적으로 업데이트됩니다
 (메뉴 **≡ → 업데이트 확인...**). 7z 및 기타 7-Zip 포맷 지원을 위해 [7-Zip](https://www.7-zip.org)의 `7z.dll`이 번들로 포함되어 있습니다(GNU LGPL 라이선스; 라이선스 전문은 `plugins\mtn.7z\license.txt`, 상세 내용은 [THIRD-PARTY.md](THIRD-PARTY.md) 참조). 필요한 경우 `plugins\mtn.7z\`의 DLL을 사용자의 x64 버전으로 교체할 수 있으며, zip 파일은 이 DLL 없이도 열 수 있습니다.
+
+**Linux:** `tar xzf MTN2-*-linux-x64.tar.gz && ./mtn2/install.sh`(모든 사용자용은 `sudo`) 또는
+`sudo apt install ./MTN2-*-linux-x64.deb`. 설치 후 `mtn2`는 터미널 버전을, `mtn2-sdl`은 SDL2 창을 실행합니다.
+압축을 푼 폴더는 설치 없이도 실행됩니다: `mtn2/mtn2-tui`와 `mtn2/mtn2-sdl`을 그 자리에서 실행하면 됩니다.
 
 ### 개발 빌드 (Dev Builds)
 

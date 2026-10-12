@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Вопросы и обсуждения / Questions and discussions
+    url: https://github.com/Laex/MTN2/discussions
+    about: Вопросы, идеи, свои темы и плагины
+  - name: Уязвимость / Security vulnerability
+    url: https://github.com/Laex/MTN2/security/advisories/new
+    about: Сообщить о проблеме безопасности приватно

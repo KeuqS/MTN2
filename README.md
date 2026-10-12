@@ -11,9 +11,40 @@
 [![CI](https://github.com/Laex/MTN2/actions/workflows/ci.yml/badge.svg)](https://github.com/Laex/MTN2/actions/workflows/ci.yml)
 [![License: MPL-2.0](https://img.shields.io/badge/license-MPL--2.0-blue.svg)](LICENSE)
 
-![MTN2: две панели и окно «О программе»](docs/images/mtn2-about.png)
+![MTN2: панели с вкладками](docs/images/mtn2-panels.png)
 
-Что нового в каждой версии – [CHANGELOG.md](CHANGELOG.md).
+[Скачать последнюю версию](https://github.com/Laex/MTN2/releases/latest) ·
+[Что нового](CHANGELOG.md) · [Частые вопросы](docs/FAQ.md) ·
+[Обсуждения](https://github.com/Laex/MTN2/discussions) ·
+[Статья на Хабре](https://habr.com/ru/articles/1087174/)
+
+MTN2 сделан для тех, кто привык к DOS Navigator и Far Manager и работает с клавиатуры: системные и сетевые инженеры,
+разработчики, администраторы. Он не заменяет Far Manager и не конкурирует с Total Commander, это ещё один
+двухпанельник со своими привычками.
+
+## Принципы
+
+- **Без телеметрии и облачных функций.** Единственное обращение к сети – проверка новой версии на GitHub (раз в сутки,
+  при запуске); её можно отключить в **≡ → Обновления...** (флажок «Проверять обновления при запуске»).
+  Подробнее – в [FAQ](docs/FAQ.md).
+- **Переносимость.** Один каталог без установщика и записей в реестр; в переносной версии настройки лежат рядом с
+  `MTN2.exe`, в обычной – в `%APPDATA%\MTN2`. Настройки, темы и раскладка клавиш – обычные JSON-файлы.
+- **Клавиатура прежде всего.** Раскладка клавиш близка к Far Manager, полностью переопределяется; вкладки и терминалы – как в ConEmu.
+- **Настоящий терминал.** Консоль на ConPTY (cmd, PowerShell, WSL, SSH), а не имитация.
+- **Расширяемость.** Нативные и WebAssembly-плагины: свои файловые системы, панели, команды, диалоги, подсветка текста.
+
+> В статье на Хабре название расшифровано как Modern Turbo Navigator; актуальное название – **Modern Terminal Navigator**.
+
+## Скриншоты
+
+| | |
+|---|---|
+| ![Две панели с вкладками](docs/images/mtn2-panels.png) | ![Архив как папка](docs/images/mtn2-archive.png) |
+| Панели с вкладками, тема Far Classic | Архив открывается как папка |
+| ![Просмотр Markdown](docs/images/mtn2-markdown.png) | ![Редактор с подсветкой JSON](docs/images/mtn2-editor.png) |
+| Просмотр Markdown с таблицами | Редактор, подсветка даёт плагин |
+| ![Встроенная консоль](docs/images/mtn2-console.png) | ![Тема Dracula](docs/images/mtn2-dracula.png) |
+| Встроенная консоль (Ctrl+O) | Тема Dracula |
 
 ## Возможности
 
@@ -54,13 +85,18 @@ Wayland (в Windows – через WSLg), входит в готовые пак�
 
 - `MTN2-<версия>-win64.zip` – настройки и история хранятся в `%APPDATA%\MTN2`;
 - `MTN2-<версия>-win64-portable.zip` – переносная версия: всё хранится рядом с `MTN2.exe`;
-- `MTN2-<версия>-linux-x64.tar.gz` и `MTN2-<версия>-linux-x64.deb` – версия для терминала Linux (`mtn2-tui`):
+- `MTN2-<версия>-linux-x64.tar.gz` и `MTN2-<версия>-linux-x64.deb` – версия для Linux: `mtn2-tui` (внутри окна терминала,
+  работает по SSH) и пробная графическая `mtn2-sdl` (окно SDL2, нужны `libSDL2` и `libfreetype`):
   установка, зависимости и параметры – в [docs/LINUX.md](docs/LINUX.md).
 
-Архив достаточно распаковать в любую папку и запустить `MTN2.exe`. Дальше программа обновляется сама
+**Windows:** архив достаточно распаковать в любую папку и запустить `MTN2.exe`. Дальше программа обновляется сама
 (меню **≡ → Обновления...**). В комплект входит `7z.dll` из [7-Zip](https://www.7-zip.org) (GNU LGPL; тексты лицензий – в
 `plugins\mtn.7z\license.txt`, подробности – в [THIRD-PARTY.md](THIRD-PARTY.md)): с ней открываются архивы 7z и другие
 форматы 7-Zip. Её можно заменить своей x64-версией в `plugins\mtn.7z\`; zip открывается и без неё.
+
+**Linux:** `tar xzf MTN2-*-linux-x64.tar.gz && ./mtn2/install.sh` (для всех пользователей – с `sudo`) или
+`sudo apt install ./MTN2-*-linux-x64.deb`. После установки `mtn2` запускает версию для терминала, `mtn2-sdl` – окно SDL2.
+Папку из архива можно и не устанавливать: `mtn2/mtn2-tui` и `mtn2/mtn2-sdl` запускаются там, где лежат.
 
 ### Dev-сборки
 
@@ -100,6 +136,8 @@ Dev-сборки содержат свежие изменения и могут 
 
 ## Документация
 
+- [FAQ.md](docs/FAQ.md) – частые вопросы: сеть и приватность, SmartScreen, масштаб экрана, темы, плагины.
+- [CONTRIBUTING.md](CONTRIBUTING.md) – как сообщить об ошибке, предложить идею, собрать проект и отправить изменение.
 - [SDS.md](docs/SDS.md) – полная спецификация: концепция, структуры данных, API, дорожная карта.
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md) – слои, потоки данных и инварианты.
 - [BUILDING.md](docs/BUILDING.md) – сборка, тесты, CI/CD.

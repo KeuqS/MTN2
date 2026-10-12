@@ -9,6 +9,12 @@
 
 Переносной режим включает файл `portable.dat` рядом с `MTN2.exe`: удалите его, чтобы перейти на `%APPDATA%\MTN2`, или создайте, чтобы перейти обратно (настройки при этом не переносятся). Для переносной копии папка должна быть доступна на запись. Встроенное обновление работает в обоих вариантах и сохраняет `portable.dat` и настройки.
 
+### Linux
+
+`MTN2-{{TAG}}-linux-x64.tar.gz` и `MTN2-{{TAG}}-linux-x64.deb` (Linux x86-64): `mtn2-tui` работает внутри окна терминала, в том числе по SSH и в `tmux`; `mtn2-sdl` – пробная версия в обычном окне SDL2. Установка: `tar xzf MTN2-*-linux-x64.tar.gz && ./mtn2/install.sh` или `sudo apt install ./MTN2-*-linux-x64.deb`, затем `mtn2` или `mtn2-sdl`. Зависимости и параметры – в [LINUX.md](https://github.com/Laex/MTN2/blob/main/docs/LINUX.md).
+
+Ответы на частые вопросы (сеть и приватность, SmartScreen, масштаб экрана, темы, плагины) – в [FAQ.md](https://github.com/Laex/MTN2/blob/main/docs/FAQ.md).
+
 ### Поддержка 7z-архивов (`7z.dll`)
 
 В архив входит `7z.dll` из [7-Zip](https://www.7-zip.org) (x64): с ней плагин `mtn.7z` открывает `.7z` и другие архивы.
