@@ -69,6 +69,17 @@ type
 function PanelRowToJson(const ARow: TPanelRow): string;
 
 type
+  /// <summary>Liveness flag shared by the model and the closures it hands to
+  /// worker threads or queues to the main thread. Those closures can run after
+  /// the model is freed, so they test this flag (kept alive by the closure)
+  /// before touching any model field.</summary>
+  IModelLife = interface
+    ['{3A7D5E21-84C6-4F0B-A1D9-6E52B7C90F14}']
+    function GetAlive: Boolean;
+    procedure SetAlive(AValue: Boolean);
+    property Alive: Boolean read GetAlive write SetAlive;
+  end;
+
   TFilePanelModel = class(TInterfacedObject, IPanelModel)
   private
     FVfs: IVirtualFileSystem;
@@ -77,7 +88,7 @@ type
     FRawRows: TPanelRows;
     FRows: TPanelRows;
     FLoading: Boolean;
-    FAlive: Boolean;
+    FLife: IModelLife;
     FGen: Cardinal;
     FCancel: IJobCancelToken;
     FSortColumn: TPanelSortColumn;
@@ -179,12 +190,31 @@ begin
   end;
 end;
 
+type
+  TModelLife = class(TInterfacedObject, IModelLife)
+  private
+    FAlive: Boolean;
+    function GetAlive: Boolean;
+    procedure SetAlive(AValue: Boolean);
+  end;
+
+function TModelLife.GetAlive: Boolean;
+begin
+  Result := FAlive;
+end;
+
+procedure TModelLife.SetAlive(AValue: Boolean);
+begin
+  FAlive := AValue;
+end;
+
 constructor TFilePanelModel.Create(const AVfs: IVirtualFileSystem; AWindowId: Integer);
 begin
   inherited Create;
   FVfs := AVfs;
   FWindowId := AWindowId;
-  FAlive := True;
+  FLife := TModelLife.Create;
+  FLife.Alive := True;
   FLoading := False;
   FURI := '';
   FSortColumn := pscNone;
@@ -197,7 +227,7 @@ end;
 
 destructor TFilePanelModel.Destroy;
 begin
-  FAlive := False;
+  FLife.Alive := False;
   CancelPending;
   FOnInvalidate := nil;
   FOnChanged := nil;
@@ -232,7 +262,7 @@ end;
 
 procedure TFilePanelModel.ApplyRows(const ARows: TPanelRows; AGen: Cardinal);
 begin
-  if not FAlive or (AGen <> FGen) then
+  if (AGen <> FGen) then
     Exit;
   FRawRows := ARows;
   RebuildSortedRows;
@@ -245,7 +275,7 @@ procedure TFilePanelModel.ApplySlowHint(const ARows: TPanelRows; AGen: Cardinal)
 begin
   // Still loading (not FLoading) -- a superseded/finished request must not
   // stomp over whatever ApplyRows already showed for a newer navigation.
-  if not FAlive or (AGen <> FGen) or not FLoading then
+  if (AGen <> FGen) or not FLoading then
     Exit;
   FRawRows := ARows;
   RebuildSortedRows;
@@ -430,6 +460,7 @@ var
   Gen: Cardinal;
   Token: IJobCancelToken;
   KeepVisual: Boolean;
+  Life: IModelLife;
 begin
   URI := AURI;
   if URI = '' then
@@ -455,6 +486,7 @@ begin
 
   Token := TJobCancelToken.Create;
   FCancel := Token;
+  Life := FLife;
 
   FVfs.ListDirectoryAsync(URI, Token,
     procedure(const AItems: TArray<TVfsEntry>; const AError: TVfsError)
@@ -462,7 +494,7 @@ begin
       Rows: TPanelRows;
       Msg: string;
     begin
-      if not FAlive or (Gen <> FGen) then
+      if not Life.Alive or (Gen <> FGen) then
         Exit;
       if AError.Code = vecCancelled then
       begin
@@ -516,6 +548,8 @@ begin
       TThread.Queue(nil,
         procedure
         begin
+          if not Life.Alive then
+            Exit;
           ApplySlowHint(ErrorRows(URI,
             'Not responding yet -- still trying (this can take a while on a slow/unreachable drive)...',
             ReturnUri), Gen);
