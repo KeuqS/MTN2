@@ -58,6 +58,8 @@ jobs:
         run: |
           ./src/build-linux.ps1 -Rebuild -Sdl
           ./src/tests/run-tests-linux.ps1
+          # A failed test run must stop the step; the script's exit code alone does not.
+          if ($LASTEXITCODE -ne 0) { throw "Linux tests failed ($LASTEXITCODE)" }
           ./src/tools/package-linux.ps1 -Version $env:TAG
 
       - name: Publish GitHub Release
